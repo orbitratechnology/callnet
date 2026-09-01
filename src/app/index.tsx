@@ -1,98 +1,76 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, Stack } from 'expo-router';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { PersonRow } from '@/components/person-row';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
+import { Colors, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+const recentPeople = [
+  { id: 'alex', name: 'Alex Morgan', initials: 'AM', detail: 'Last call · Yesterday' },
+  { id: 'sarah', name: 'Sarah Chen', initials: 'SC', detail: 'Last call · Monday' },
+  { id: 'david', name: 'David Okafor', initials: 'DO', detail: 'Last call · Sunday' },
+];
 
 export default function HomeScreen() {
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <>
+      <Stack.Screen options={{ title: 'Callnet', headerLargeTitle: true }} />
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
+        <View style={styles.container}>
+          <View style={styles.intro}>
+            <ThemedText variant="title">Private calls, made simple.</ThemedText>
+            <ThemedText variant="body" tone="secondary" selectable>
+              Find someone you know and connect in a single focused flow.
+            </ThemedText>
+          </View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+          <Button title="Start a call" size="lg" onPress={() => router.push('/select-person')} />
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ThemedText variant="headline">Recent</ThemedText>
+              <IconButton label="Profile" onPress={() => router.push('/profile')} />
+            </View>
+            <View style={styles.list}>
+              {recentPeople.map((person) => (
+                <PersonRow
+                  key={person.id}
+                  name={person.name}
+                  initials={person.initials}
+                  detail={person.detail}
+                  onPress={() => router.push('/select-person')}
+                />
+              ))}
+            </View>
+          </View>
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+          <View style={styles.privacyNote}>
+            <ThemedText variant="caption" tone="brand">PRIVATE BY DESIGN</ThemedText>
+            <ThemedText variant="subhead" tone="secondary" selectable>
+              A calm, focused calling space with privacy details kept clear and factual.
+            </ThemedText>
+          </View>
+        </View>
+      </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  content: { flexGrow: 1, padding: Spacing.lg, paddingBottom: Spacing.xxl },
+  container: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', gap: Spacing.xl },
+  intro: { gap: Spacing.sm, paddingTop: Spacing.md },
+  section: { gap: Spacing.md },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  list: { gap: Spacing.sm },
+  privacyNote: {
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.secondaryBackground,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.separator,
   },
 });

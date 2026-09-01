@@ -1,18 +1,26 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
+import { Stack } from 'expo-router/stack';
 import { useColorScheme } from 'react-native';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { Colors } from '@/constants/theme';
 
-SplashScreen.preventAutoHideAsync();
-
-export default function TabLayout() {
+export default function RootLayout() {
   const colorScheme = useColorScheme();
+
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
+      <Stack
+        screenOptions={{
+          contentStyle: { backgroundColor: Colors.systemBackground },
+          headerBackButtonDisplayMode: 'minimal',
+          headerShadowVisible: false,
+        }}
+      >
+        <Stack.Screen name="index" options={{ title: 'Callnet', headerLargeTitle: true }} />
+        <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+        <Stack.Screen name="select-person" options={{ title: 'Start a call', presentation: 'formSheet' }} />
+        <Stack.Screen name="call" options={{ title: 'Call', headerShown: false, presentation: 'fullScreenModal' }} />
+      </Stack>
     </ThemeProvider>
   );
 }
