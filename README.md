@@ -25,6 +25,12 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Development WebRTC mode
+
+The default `EXPO_PUBLIC_CALL_MODE=demo` keeps the local calling flow available without native dependencies. Real two-device calls require a development client with the Phase 3 native packages installed.
+
+Use `device-a` and `device-b` as the two development-only identities, point both clients at the same `EXPO_PUBLIC_SIGNALING_URL`, and keep TURN credentials in local environment files only. The signaling service is started separately with `bun run signaling:dev`; it refuses to run when `NODE_ENV=production`.
+
 ## Get a fresh project
 
 When you're ready, run:

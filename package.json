@@ -3,10 +3,13 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
+    "@config-plugins/react-native-webrtc": "15.0.2",
     "@expo/ui": "~57.0.15",
     "expo": "~57.0.19",
     "expo-constants": "~57.0.17",
+    "expo-dev-client": "~57.0.10",
     "expo-device": "~57.0.1",
+    "expo-file-system": "~57.0.6",
     "expo-font": "~57.0.3",
     "expo-glass-effect": "~57.0.1",
     "expo-image": "~57.0.4",
@@ -24,18 +27,24 @@
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "react-native-incall-manager": "4.2.2",
+    "react-native-webrtc": "124.0.8",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.10.1"
+    "react-native-worklets": "0.10.1",
+    "socket.io": "4.8.3",
+    "socket.io-client": "4.8.3"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "tsx": "4.23.13",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
+    "signaling:dev": "tsx server/index.ts",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint"
   },
