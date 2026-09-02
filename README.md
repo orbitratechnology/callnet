@@ -1,35 +1,28 @@
-# Welcome to your Expo app 👋
+# Callnet
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Callnet is an Expo SDK 57 one-to-one voice and video calling app. The app uses Firebase email/password authentication and Firebase UID-based Socket.IO signaling. Native WebRTC runs in an Expo development build, not Expo Go.
 
-## Get started
+## Local setup
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
+1. Copy `.env.example` to `.env.local` and fill in the Firebase web configuration and local TURN values. `.env.local` is ignored by Git.
+2. Install dependencies with the repository package manager.
+3. Have the user build/install a fresh Expo development client after native dependency changes.
+4. Start Metro and the signaling service separately:
 
    ```bash
    npx expo start
+   bun run signaling:dev
    ```
 
-In the output, you'll find options to open the app in a
+For physical devices, `EXPO_PUBLIC_SIGNALING_URL` must resolve to the signaling host. With an ADB reverse tunnel it can be `http://127.0.0.1:8787`; on the LAN it should use the host's LAN address. The server verifies Firebase ID tokens for `FIREBASE_PROJECT_ID` before relaying any call event.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Authenticated calling flow
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Create or sign in to a real Firebase email/password account on each device. From Profile, copy the other account's Firebase UID, add it as a contact, and start a voice or video call. No development identity is accepted by the authenticated signaling server.
 
-## Development WebRTC mode
+Native Google sign-in and Firestore-backed user discovery are intentionally deferred to the next Firebase subphase. The web adapter already contains the Google popup path.
 
-The default `EXPO_PUBLIC_CALL_MODE=demo` keeps the local calling flow available without native dependencies. Real two-device calls require a development client with the Phase 3 native packages installed.
-
-Use `device-a` and `device-b` as the two development-only identities, point both clients at the same `EXPO_PUBLIC_SIGNALING_URL`, and keep TURN credentials in local environment files only. The signaling service is started separately with `bun run signaling:dev`; it refuses to run when `NODE_ENV=production`.
+Keep TURN credentials and Firebase admin credentials out of source control. Firebase client configuration is public client configuration; the signaling server must use Firebase ID-token verification and must never receive a service-account key in the mobile app.
 
 ## Get a fresh project
 

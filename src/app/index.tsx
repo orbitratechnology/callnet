@@ -56,21 +56,22 @@ function HomeFooter({ onIncomingCall }: { onIncomingCall: () => void }) {
   );
 }
 
-function WebRTCFooter() {
+function WebRTCFooter({ error }: { error: string | null }) {
   return (
     <View style={styles.footerContent}>
       <View style={styles.privacyNote}>
-        <ThemedText variant="caption" tone="brand">DEVELOPMENT WEBRTC MODE</ThemedText>
+        <ThemedText variant="caption" tone="brand">AUTHENTICATED WEBRTC MODE</ThemedText>
         <ThemedText variant="subhead" tone="secondary" selectable>
-          This build uses seeded device identities and a development signaling service.
+          Calls use your Firebase identity and a secure Socket.IO signaling connection.
         </ThemedText>
+        {error ? <ThemedText variant="caption" tone="destructive">{error}</ThemedText> : null}
       </View>
     </View>
   );
 }
 
 export default function HomeScreen() {
-  const { recentCalls, simulateIncoming, transportMode } = useCall();
+  const { recentCalls, simulateIncoming, transportMode, transportError } = useCall();
 
   const startDemoIncomingCall = () => {
     simulateIncoming(demoPeople[0], 'voice');
@@ -108,7 +109,7 @@ export default function HomeScreen() {
         ListFooterComponent={
           transportMode === 'demo'
             ? <HomeFooter onIncomingCall={startDemoIncomingCall} />
-            : <WebRTCFooter />
+            : <WebRTCFooter error={transportError} />
         }
       />
     </>

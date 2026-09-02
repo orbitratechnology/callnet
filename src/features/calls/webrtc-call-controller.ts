@@ -4,8 +4,8 @@ import {
   type CallEventType,
   type CallKind,
   type CallSignalPayload,
-  type DevelopmentIdentity,
-  type DevelopmentIdentityId,
+  type CallIdentity,
+  type CallIdentityId,
 } from '../../../shared/call-protocol';
 import { NativeAudioRoutingAdapter, type AudioRoutingAdapter } from './audio-routing';
 import {
@@ -20,12 +20,13 @@ import { SocketIoSignalingTransport } from './socket-io-signaling';
 import type { SignalingTransport } from './signaling-transport';
 
 export type RealCallControllerEvent =
-  | { type: 'incoming'; callId: string; kind: CallKind; from: DevelopmentIdentityId; timestamp: number }
+  | { type: 'incoming'; callId: string; kind: CallKind; from: CallIdentityId; timestamp: number }
   | { type: 'state'; callId: string; state: 'connecting' | 'connected' | 'ended' | 'failed'; failureReason?: string }
   | { type: 'streams'; localStreamUrl: string | null; remoteStreamUrl: string | null };
 
 export type WebRTCCallControllerOptions = {
-  identity: DevelopmentIdentity;
+  identity: CallIdentity;
+  authToken: string;
   signalingUrl: string;
   iceServers?: Array<{ urls: string | string[]; username?: string; credential?: string }>;
   transport?: SignalingTransport;
@@ -35,15 +36,20 @@ export type WebRTCCallControllerOptions = {
 
 type ActiveCall = {
   callId: string;
-  peerId: DevelopmentIdentityId;
+  peerId: CallIdentityId;
   kind: CallKind;
   direction: 'incoming' | 'outgoing';
   state: 'ringing' | 'connecting' | 'connected';
   remoteDescriptionSet: boolean;
 };
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export class WebRTCCallController {
-  private readonly identity: DevelopmentIdentity;
+  private readonly identity: CallIdentity;
+  private readonly authToken: string;
   private readonly transport: SignalingTransport;
   private readonly media: MediaEngine;
   private readonly audioRouter: AudioRoutingAdapter;
@@ -58,6 +64,7 @@ export class WebRTCCallController {
 
   constructor(options: WebRTCCallControllerOptions) {
     this.identity = options.identity;
+    this.authToken = options.authToken;
     this.transport = options.transport ?? new SocketIoSignalingTransport({ url: options.signalingUrl });
     this.audioRouter = options.audioRouter ?? new NativeAudioRoutingAdapter();
     this.media = options.mediaEngine ?? new NativeWebRTCMediaEngine({
@@ -75,7 +82,7 @@ export class WebRTCCallController {
     }
 
     this.unsubscribeFromTransport = this.transport.subscribe((event) => void this.handleEvent(event));
-    await this.transport.connect(this.identity);
+    await this.transport.connect({ identity: this.identity, idToken: this.authToken });
     this.isConnected = true;
   }
 
@@ -84,7 +91,7 @@ export class WebRTCCallController {
     return () => this.listeners.delete(listener);
   }
 
-  async startOutgoing(input: { callId: string; peerId: DevelopmentIdentityId; kind: CallKind }) {
+  async startOutgoing(input: { callId: string; peerId: CallIdentityId; kind: CallKind }) {
     await this.connect();
     if (this.activeCall) {
       throw new Error('A WebRTC call is already active.');
@@ -101,20 +108,32 @@ export class WebRTCCallController {
 
     try {
       await this.startLocalMedia(input.kind);
-      this.audioRouter.start(input.kind);
+      try {
+        this.audioRouter.start(input.kind);
+      } catch (error) {
+        throw new Error(`audio-routing-start:${getErrorMessage(error)}`);
+      }
       await this.sendEvent(input.callId, input.peerId, 'call:invite', {
         kind: 'call',
         callKind: input.kind,
       });
       this.emit({ type: 'state', callId: input.callId, state: 'connecting' });
-      const offer = await this.media.createOffer();
+      let offer: SessionDescription;
+      try {
+        offer = await this.media.createOffer();
+      } catch (error) {
+        throw new Error(`webrtc-create-offer:${getErrorMessage(error)}`);
+      }
       await this.sendEvent(input.callId, input.peerId, 'webrtc:offer', {
         kind: 'session-description',
         type: 'offer',
         sdp: offer.sdp,
       });
     } catch (error) {
-      await this.failActiveCall(input.callId, 'webrtc-start-failed');
+      await this.failActiveCall(
+        input.callId,
+        error instanceof Error ? error.message : 'webrtc-start-failed',
+      );
       throw error;
     }
   }
@@ -127,7 +146,11 @@ export class WebRTCCallController {
 
     try {
       await this.startLocalMedia(call.kind);
-      this.audioRouter.start(call.kind);
+      try {
+        this.audioRouter.start(call.kind);
+      } catch (error) {
+        throw new Error(`audio-routing-start:${getErrorMessage(error)}`);
+      }
       call.state = 'connecting';
       await this.sendEvent(call.callId, call.peerId, 'call:accept', { kind: 'empty' });
       this.emit({ type: 'state', callId: call.callId, state: 'connecting' });
@@ -138,7 +161,10 @@ export class WebRTCCallController {
         await this.handleOffer(offer);
       }
     } catch (error) {
-      await this.failActiveCall(call.callId, 'webrtc-accept-failed');
+      await this.failActiveCall(
+        call.callId,
+        error instanceof Error ? error.message : 'webrtc-accept-failed',
+      );
       throw error;
     }
   }
@@ -156,19 +182,19 @@ export class WebRTCCallController {
   }
 
   setMuted(muted: boolean) {
-    this.localMedia?.stream.getTracks().forEach((track) => {
+    (this.localMedia?.stream.getTracks?.() ?? []).forEach((track) => {
       if (!track.kind || track.kind === 'audio') track.enabled = !muted;
     });
   }
 
   setCameraEnabled(enabled: boolean) {
-    this.localMedia?.stream.getTracks().forEach((track) => {
+    (this.localMedia?.stream.getTracks?.() ?? []).forEach((track) => {
       if (track.kind === 'video') track.enabled = enabled;
     });
   }
 
   switchCamera() {
-    this.localMedia?.stream.getTracks().forEach((track) => {
+    (this.localMedia?.stream.getTracks?.() ?? []).forEach((track) => {
       if (track.kind === 'video') track._switchCamera?.();
     });
   }
@@ -186,7 +212,7 @@ export class WebRTCCallController {
   }
 
   private async handleEvent(event: CallEvent) {
-    if (event.to !== this.identity.id) {
+    if (event.to !== this.identity.uid) {
       return;
     }
 
@@ -293,9 +319,13 @@ export class WebRTCCallController {
   }
 
   private async startLocalMedia(kind: CallKind) {
-    const localMedia = await this.media.startLocalMedia(kind === 'video' ? 'video' : 'audio');
-    this.localMedia = localMedia;
-    this.emit({ type: 'streams', localStreamUrl: localMedia.streamUrl, remoteStreamUrl: this.remoteStreamUrl });
+    try {
+      const localMedia = await this.media.startLocalMedia(kind === 'video' ? 'video' : 'audio');
+      this.localMedia = localMedia;
+      this.emit({ type: 'streams', localStreamUrl: localMedia.streamUrl, remoteStreamUrl: this.remoteStreamUrl });
+    } catch (error) {
+      throw new Error(`webrtc-local-media:${getErrorMessage(error)}`);
+    }
   }
 
   private handleRemoteStream(stream: MediaStreamLike) {
@@ -319,14 +349,14 @@ export class WebRTCCallController {
 
   private async sendEvent(
     callId: string,
-    peerId: DevelopmentIdentityId,
+    peerId: CallIdentityId,
     type: CallEventType,
     payload: CallSignalPayload,
   ) {
     await this.transport.send(createCallEvent({
       type,
       callId,
-      from: this.identity.id,
+      from: this.identity.uid,
       to: peerId,
       payload,
     }));

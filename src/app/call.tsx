@@ -6,7 +6,6 @@ import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { getDemoPerson } from '@/features/contacts/demo-people';
 import { useCall } from '@/features/calls/call-provider';
 import type { CallKind, CallState } from '@/features/calls/call-state';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -98,8 +97,9 @@ export default function CallScreen() {
     toggleSpeaker,
     toggleCamera,
     switchCamera,
+    contacts,
   } = useCall();
-  const selectedPerson = getDemoPerson(personId) ?? session?.person;
+  const selectedPerson = contacts.find((person) => person.id === personId) ?? session?.person;
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -132,6 +132,7 @@ export default function CallScreen() {
   const isBusyWithAnotherPerson = Boolean(session && !isTerminal(session.state) && !isCurrentSession);
   const isReady = !session || !isCurrentSession;
   const duration = session?.connectedAt ? Math.max(0, Math.floor((now - session.connectedAt) / 1000)) : 0;
+  const failureReason = session?.failureReason;
 
   const startCall = (kind: CallKind) => {
     void startOutgoing(selectedPerson, kind);
@@ -165,13 +166,20 @@ export default function CallScreen() {
           </ThemedText>
         ) : null}
         {currentState === 'failed' ? (
-          <ThemedText variant="subhead" tone="secondary" style={styles.centered}>
-            {session?.failureReason?.includes('permission')
+          <View style={styles.failureCopy}>
+            <ThemedText variant="subhead" tone="secondary" style={styles.centered}>
+              {failureReason?.includes('permission')
               ? 'Microphone or camera permission was denied.'
               : transportMode === 'webrtc'
-                ? 'The development call could not connect.'
+                ? 'The authenticated call could not connect.'
                 : 'The demo call could not connect.'}
-          </ThemedText>
+            </ThemedText>
+            {__DEV__ && failureReason && !failureReason.includes('permission') ? (
+              <ThemedText variant="caption" tone="secondary" style={styles.centered}>
+                Diagnostic: {failureReason}
+              </ThemedText>
+            ) : null}
+          </View>
         ) : null}
         {transportError ? (
           <ThemedText variant="caption" tone="secondary" style={styles.centered}>
@@ -261,6 +269,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.secondaryBackground,
   },
   centered: { textAlign: 'center' },
+  failureCopy: { alignItems: 'center', gap: Spacing.xs },
   actions: { gap: Spacing.sm, paddingBottom: Spacing.md },
   controlRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.md, paddingBottom: Spacing.sm },
   videoStage: {

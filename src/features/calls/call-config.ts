@@ -1,30 +1,7 @@
-import {
-  DEVELOPMENT_IDENTITY_IDS,
-  type DevelopmentIdentity,
-  type DevelopmentIdentityId,
-} from '../../../shared/call-protocol';
-
-declare const __DEV__: boolean;
-
 export type CallTransportMode = 'demo' | 'webrtc';
 
-export function getDevelopmentIdentity(
-  requestedId = process.env.EXPO_PUBLIC_DEV_IDENTITY,
-): DevelopmentIdentity {
-  if (!__DEV__) {
-    throw new Error('Seeded development identities are disabled outside development builds.');
-  }
-
-  const id = requestedId as DevelopmentIdentityId | undefined;
-  if (!id || !DEVELOPMENT_IDENTITY_IDS.includes(id)) {
-    throw new Error('EXPO_PUBLIC_DEV_IDENTITY must be device-a or device-b.');
-  }
-
-  return { mode: 'development', id };
-}
-
 export function getCallTransportMode(): CallTransportMode {
-  return __DEV__ && process.env.EXPO_PUBLIC_CALL_MODE === 'webrtc' ? 'webrtc' : 'demo';
+  return process.env.EXPO_PUBLIC_CALL_MODE === 'webrtc' ? 'webrtc' : 'demo';
 }
 
 export function getSignalingUrl() {

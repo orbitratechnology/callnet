@@ -1,7 +1,10 @@
 export const CALL_PROTOCOL_VERSION = 1 as const;
 
-export const DEVELOPMENT_IDENTITY_IDS = ['device-a', 'device-b'] as const;
-export type DevelopmentIdentityId = (typeof DEVELOPMENT_IDENTITY_IDS)[number];
+export type CallIdentityId = string;
+export type CallIdentity = {
+  mode: 'firebase';
+  uid: CallIdentityId;
+};
 
 export type CallKind = 'voice' | 'video';
 
@@ -30,15 +33,10 @@ export type CallEvent = {
   version: typeof CALL_PROTOCOL_VERSION;
   type: CallEventType;
   callId: string;
-  from: DevelopmentIdentityId;
-  to: DevelopmentIdentityId;
+  from: CallIdentityId;
+  to: CallIdentityId;
   timestamp: number;
   payload: CallSignalPayload;
-};
-
-export type DevelopmentIdentity = {
-  mode: 'development';
-  id: DevelopmentIdentityId;
 };
 
 const callEventTypes = new Set<CallEventType>([
@@ -56,8 +54,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object');
 }
 
-function isDevelopmentIdentityId(value: unknown): value is DevelopmentIdentityId {
-  return value === 'device-a' || value === 'device-b';
+function isCallIdentityId(value: unknown): value is CallIdentityId {
+  return typeof value === 'string' && value.length > 0 && value.length <= 128;
 }
 
 function isCallKind(value: unknown): value is CallKind {
@@ -108,8 +106,8 @@ export function isCallEvent(value: unknown): value is CallEvent {
     typeof value.callId === 'string' &&
     value.callId.length > 0 &&
     value.callId.length <= 128 &&
-    isDevelopmentIdentityId(value.from) &&
-    isDevelopmentIdentityId(value.to) &&
+    isCallIdentityId(value.from) &&
+    isCallIdentityId(value.to) &&
     value.from !== value.to &&
     typeof value.timestamp === 'number' &&
     Number.isFinite(value.timestamp) &&
@@ -125,6 +123,6 @@ export function createCallEvent(input: Omit<CallEvent, 'version' | 'timestamp'> 
   };
 }
 
-export function isDevelopmentIdentity(value: unknown): value is DevelopmentIdentity {
-  return isRecord(value) && value.mode === 'development' && isDevelopmentIdentityId(value.id);
+export function isCallIdentity(value: unknown): value is CallIdentity {
+  return isRecord(value) && value.mode === 'firebase' && isCallIdentityId(value.uid);
 }

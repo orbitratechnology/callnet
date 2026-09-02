@@ -5,11 +5,16 @@ This gate must pass before Firebase Auth or Firestore work begins. It is a manua
 ## Current gate status
 
 - [x] Android development client opened with `agent-device`.
+- [x] Debug APK installed on both Android targets.
+- [x] USB ADB reverse tunnels established for Metro `8081` and signaling `8787` on both targets.
 - [x] Home → person selection → call screen navigation verified.
 - [x] Real voice-call attempt reached the terminal failure state without crashing.
-- [x] Signaling host reachability verified on localhost and LAN port `8787`.
+- [ ] Signaling host is currently reachable: bounded check found no listener on `127.0.0.1:8787`.
 - [x] Microphone permission prompt displayed and accepted.
-- [ ] T4.2.1 voice connection is blocked: no `device-b` peer was connected, so the call ended before media connection.
+- [x] ARS L22 loaded Callnet through a direct reverse-tunneled Expo deep link.
+- [x] Runtime development identity selector added; ARS L22 was switched to `device-b` and the other client remained `device-a`.
+- [ ] T4.2.1 voice connection is blocked: cross-device calls produced no incoming event while signaling was unavailable.
+- [ ] Socket.IO loopback probe is passing: the bounded probe returned `device-a-connect-error=websocket error`.
 - [ ] Two-device WebRTC QA is not passed.
 
 ## Task 4.1 — Provision the test environment
@@ -20,6 +25,10 @@ This gate must pass before Firebase Auth or Firestore work begins. It is a manua
 - [ ] Install a second client configured as `device-b`.
 - [ ] Run the development signaling service on the same LAN as both devices.
 - [ ] Set both clients to the signaling host's LAN URL, not `127.0.0.1`, when using physical devices.
+- [ ] For USB reverse mode, use `127.0.0.1` for Metro and signaling on both clients.
+- [ ] Serve a separate Metro bundle for `device-a` on port `8081`.
+- [ ] Serve a separate Metro bundle for `device-b` on port `8082`.
+- [ ] Reverse Metro port `8082` to the second device and launch its `127.0.0.1:8082` deep link.
 - [ ] Confirm the supplied Metered TURN values are present only in ignored local environment files.
 - [ ] Confirm the Metered API key is not in the mobile environment or bundle.
 

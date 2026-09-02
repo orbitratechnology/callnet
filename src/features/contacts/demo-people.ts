@@ -1,12 +1,10 @@
-import type { DevelopmentIdentityId } from '../../../shared/call-protocol';
-
 export type DemoPerson = {
   id: string;
   name: string;
   handle: string;
   initials: string;
   accent: string;
-  developmentIdentityId: DevelopmentIdentityId;
+  identityId: string;
 };
 
 export const demoPeople: DemoPerson[] = [
@@ -16,7 +14,7 @@ export const demoPeople: DemoPerson[] = [
     handle: '@mayac',
     initials: 'MC',
     accent: '#9B8AFB',
-    developmentIdentityId: 'device-b',
+    identityId: 'demo-maya',
   },
   {
     id: 'noah',
@@ -24,7 +22,7 @@ export const demoPeople: DemoPerson[] = [
     handle: '@noahw',
     initials: 'NW',
     accent: '#F2A65A',
-    developmentIdentityId: 'device-a',
+    identityId: 'demo-noah',
   },
   {
     id: 'sofia',
@@ -32,7 +30,7 @@ export const demoPeople: DemoPerson[] = [
     handle: '@sofiap',
     initials: 'SP',
     accent: '#54C2A4',
-    developmentIdentityId: 'device-b',
+    identityId: 'demo-sofia',
   },
 ];
 
@@ -40,6 +38,20 @@ export function getDemoPerson(personId: string | undefined) {
   return demoPeople.find((person) => person.id === personId);
 }
 
-export function getDemoPersonForDevelopmentIdentity(identityId: DevelopmentIdentityId) {
-  return demoPeople.find((person) => person.developmentIdentityId === identityId);
+export function createContactFromIdentity(identityId: string, displayName = 'Callnet user'): DemoPerson {
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('') || 'CN';
+
+  return {
+    id: `contact-${identityId}`,
+    name: displayName,
+    handle: `@${identityId.slice(0, 8)}`,
+    initials,
+    accent: '#54C2A4',
+    identityId,
+  };
 }

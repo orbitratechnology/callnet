@@ -10,9 +10,10 @@ import {
 } from 'react';
 
 import {
-  getDemoPersonForDevelopmentIdentity,
+  createContactFromIdentity,
   type DemoPerson,
 } from '../contacts/demo-people';
+import { createContactRepository, type ContactRepository, type ContactInput } from '../contacts/contacts-repository';
 import {
   callReducer,
   createCallSession,
@@ -26,13 +27,8 @@ import {
   type RecentCallRepository,
 } from '../recents/recent-call-repository';
 import { DemoPermissionService, type PermissionService } from './permission-service';
-import {
-  getCallTransportMode,
-  getDevelopmentIdentity,
-  getIceServers,
-  getSignalingUrl,
-  type CallTransportMode,
-} from './dev-identity';
+import { getCallTransportMode, getIceServers, getSignalingUrl, type CallTransportMode } from './call-config';
+import { useAuth } from '../auth/auth-provider';
 import {
   WebRTCCallController,
   type RealCallControllerEvent,
@@ -51,6 +47,8 @@ export interface CallController {
 type CallContextValue = CallController & {
   session: CallSession | null;
   recentCalls: RecentCall[];
+  contacts: DemoPerson[];
+  addContact(contact: ContactInput): void;
   transportMode: CallTransportMode;
   transportError: string | null;
   localStreamUrl: string | null;
@@ -83,6 +81,7 @@ export function CallProvider({
   permissionService = defaultPermissionService,
   recentCallRepository,
 }: CallProviderProps) {
+  const { user, getIdToken } = useAuth();
   const [session, dispatch] = useReducer(callReducer, null);
   const [transportError, setTransportError] = useState<string | null>(null);
   const [localStreamUrl, setLocalStreamUrl] = useState<string | null>(null);
@@ -91,10 +90,17 @@ export function CallProvider({
   const permissionServiceRef = useRef(permissionService);
   const recentCallRepositoryRef = useRef<RecentCallRepository | null>(null);
   if (recentCallRepositoryRef.current === null) {
-    recentCallRepositoryRef.current = recentCallRepository ?? createRecentCallRepository();
+    recentCallRepositoryRef.current = recentCallRepository ?? createRecentCallRepository(user?.uid);
   }
   const [recentCalls, setRecentCalls] = useState<RecentCall[]>(() =>
     recentCallRepositoryRef.current!.load(),
+  );
+  const contactRepositoryRef = useRef<ContactRepository | null>(null);
+  if (contactRepositoryRef.current === null && user) {
+    contactRepositoryRef.current = createContactRepository(user.uid);
+  }
+  const [contacts, setContacts] = useState<DemoPerson[]>(() =>
+    contactRepositoryRef.current?.load() ?? [],
   );
   const timersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const recordedCallIdsRef = useRef<Set<string>>(new Set());
@@ -105,16 +111,22 @@ export function CallProvider({
 
   sessionRef.current = session;
 
-  const getRealController = () => {
+  const getRealController = (idToken: string) => {
+    if (!user) {
+      throw new Error('Sign in before connecting to calls.');
+    }
     if (!realControllerRef.current) {
       realControllerRef.current = new WebRTCCallController({
-        identity: getDevelopmentIdentity(),
+        identity: { mode: 'firebase', uid: user.uid },
+        authToken: idToken,
         signalingUrl: getSignalingUrl(),
         iceServers: getIceServers(),
       });
     }
     return realControllerRef.current;
   };
+
+  const getConnectedController = async () => getRealController(await getIdToken());
 
   const clearTimers = () => {
     timersRef.current.forEach((timer) => clearTimeout(timer));
@@ -157,8 +169,9 @@ export function CallProvider({
 
   const handleRealEvent = (event: RealCallControllerEvent) => {
     if (event.type === 'incoming') {
-      const person = getDemoPersonForDevelopmentIdentity(event.from);
-      if (!person || (sessionRef.current && isActiveState(sessionRef.current.state))) {
+      const person = contacts.find((contact) => contact.identityId === event.from)
+        ?? createContactFromIdentity(event.from);
+      if (sessionRef.current && isActiveState(sessionRef.current.state)) {
         return;
       }
 
@@ -186,28 +199,35 @@ export function CallProvider({
   };
 
   useEffect(() => {
-    if (transportMode !== 'webrtc') {
+    if (transportMode !== 'webrtc' || !user) {
       return;
     }
 
-    let controller: WebRTCCallController;
-    try {
-      controller = getRealController();
-    } catch (error) {
-      setTransportError(error instanceof Error ? error.message : 'WebRTC is unavailable.');
-      return;
-    }
+    let cancelled = false;
+    let controller: WebRTCCallController | null = null;
+    let unsubscribe: () => void = () => undefined;
 
-    const unsubscribe = controller.subscribe(handleRealEvent);
-    void controller.connect().catch((error: unknown) => {
-      setTransportError(error instanceof Error ? error.message : 'Signaling connection failed.');
-    });
+    void getConnectedController()
+      .then((nextController) => {
+        if (cancelled) {
+          return undefined;
+        }
+        controller = nextController;
+        unsubscribe = controller.subscribe(handleRealEvent);
+        return controller.connect();
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setTransportError(error instanceof Error ? error.message : 'Signaling connection failed.');
+        }
+      });
 
     return () => {
+      cancelled = true;
       unsubscribe();
-      void controller.disconnect();
+      void controller?.disconnect();
     };
-  }, [transportMode]);
+  }, [transportMode, user?.uid]);
 
   const finish = (failureReason?: string) => {
     const currentSession = sessionRef.current;
@@ -261,11 +281,11 @@ export function CallProvider({
 
     if (transportMode === 'webrtc') {
       try {
-        await getRealController().startOutgoing({
+        await getConnectedController().then((controller) => controller.startOutgoing({
           callId: call.callId,
-          peerId: person.developmentIdentityId,
+          peerId: person.identityId,
           kind,
-        });
+        }));
       } catch (error) {
         if (activeCallIdRef.current === call.callId) {
           activeCallIdRef.current = null;
@@ -338,7 +358,7 @@ export function CallProvider({
 
     if (transportMode === 'webrtc') {
       try {
-        await getRealController().acceptIncoming();
+        await getConnectedController().then((controller) => controller.acceptIncoming());
       } catch (error) {
         dispatch({
           type: 'transition',
@@ -386,6 +406,13 @@ export function CallProvider({
     dispatch({ type: 'reset' });
   };
 
+  const addContact = (contact: ContactInput) => {
+    if (!contactRepositoryRef.current) {
+      return;
+    }
+    setContacts(contactRepositoryRef.current.add(contact));
+  };
+
   useEffect(() => {
     if (!session || !isTerminalState(session.state)) {
       return;
@@ -431,6 +458,8 @@ export function CallProvider({
   const value: CallContextValue = {
     session,
     recentCalls,
+    contacts,
+    addContact,
     transportMode,
     transportError,
     localStreamUrl,

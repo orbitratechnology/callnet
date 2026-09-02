@@ -8,8 +8,9 @@ export type MediaTrackLike = {
 };
 
 export type MediaStreamLike = {
-  getTracks(): MediaTrackLike[];
+  getTracks?(): MediaTrackLike[];
   toURL?(): string;
+  release?(): void;
 };
 
 export type SessionDescription = {
@@ -69,15 +70,51 @@ export type NativeWebRTCMediaEngineOptions = {
 
 declare const require: (moduleName: string) => unknown;
 
+function unwrapDefault<T>(value: unknown): T {
+  if (value && typeof value === 'object' && 'default' in value) {
+    return (value as { default: T }).default;
+  }
+
+  return value as T;
+}
+
 function loadWebRTCModule() {
   try {
-    return require('react-native-webrtc') as WebRTCModule;
+    const rtc = unwrapDefault<WebRTCModule>(require('react-native-webrtc'));
+
+    if (!rtc || typeof rtc.RTCPeerConnection !== 'function') {
+      throw new Error('webrtc-peer-connection-unavailable');
+    }
+
+    if (!rtc.mediaDevices || typeof rtc.mediaDevices.getUserMedia !== 'function') {
+      throw new Error('webrtc-media-devices-unavailable');
+    }
+
+    return rtc;
   } catch {
-    throw new Error('react-native-webrtc is not installed. Install Phase 3 dependencies before enabling WebRTC mode.');
+    throw new Error('webrtc-native-module-unavailable');
   }
 }
 
 const defaultIceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
+
+function getStreamTracks(stream: MediaStreamLike) {
+  try {
+    const tracks = stream.getTracks?.();
+    return Array.isArray(tracks) ? tracks : [];
+  } catch {
+    return [];
+  }
+}
+
+function releaseStream(stream: MediaStreamLike | null) {
+  if (!stream) {
+    return;
+  }
+
+  getStreamTracks(stream).forEach((track) => track.stop());
+  stream.release?.();
+}
 
 export class NativeWebRTCMediaEngine implements MediaEngine {
   private readonly options: Required<NativeWebRTCMediaEngineOptions>;
@@ -127,7 +164,7 @@ export class NativeWebRTCMediaEngine implements MediaEngine {
     this.pendingMedia = null;
     this.ensurePeerConnection();
 
-    for (const track of this.localMedia.stream.getTracks()) {
+    for (const track of getStreamTracks(this.localMedia.stream)) {
       this.peerConnection?.addTrack?.(track, this.localMedia.stream);
     }
 
@@ -163,8 +200,8 @@ export class NativeWebRTCMediaEngine implements MediaEngine {
   }
 
   async close() {
-    this.pendingMedia?.stream.getTracks().forEach((track) => track.stop());
-    this.localMedia?.stream.getTracks().forEach((track) => track.stop());
+    releaseStream(this.pendingMedia?.stream ?? null);
+    releaseStream(this.localMedia?.stream ?? null);
     this.pendingMedia = null;
     this.localMedia = null;
     this.peerConnection?.close();

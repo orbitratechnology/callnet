@@ -1,6 +1,6 @@
 import { File, Paths } from 'expo-file-system';
 
-import { demoPeople, type DemoPerson } from '../contacts/demo-people';
+import type { DemoPerson } from '../contacts/demo-people';
 
 export type RecentCallKind = 'voice' | 'video';
 export type RecentCallOutcome = 'completed' | 'missed' | 'timed-out' | 'rejected' | 'cancelled' | 'failed';
@@ -14,26 +14,7 @@ export type RecentCall = {
   timestamp: number;
 };
 
-const seedTimestamp = Date.now();
-
-const seededRecentCalls: RecentCall[] = [
-  {
-    id: 'recent-maya',
-    person: demoPeople[0],
-    kind: 'voice',
-    direction: 'incoming',
-    outcome: 'completed',
-    timestamp: seedTimestamp - 1000 * 60 * 18,
-  },
-  {
-    id: 'recent-noah',
-    person: demoPeople[1],
-    kind: 'video',
-    direction: 'outgoing',
-    outcome: 'completed',
-    timestamp: seedTimestamp - 1000 * 60 * 60 * 3,
-  },
-];
+const seededRecentCalls: RecentCall[] = [];
 
 export interface RecentCallRepository {
   load(): RecentCall[];
@@ -79,10 +60,11 @@ export class MemoryRecentCallRepository implements RecentCallRepository {
 }
 
 export class FileRecentCallRepository extends MemoryRecentCallRepository {
-  private readonly fileName = 'callnet-recent-calls-v1.json';
+  private readonly fileName: string;
 
-  constructor(seed: RecentCall[] = seededRecentCalls) {
+  constructor(ownerId: string, seed: RecentCall[] = seededRecentCalls) {
     super(seed);
+    this.fileName = `callnet-recent-calls-v1-${ownerId}.json`;
 
     try {
       const file = this.getFile();
@@ -124,6 +106,6 @@ export class FileRecentCallRepository extends MemoryRecentCallRepository {
   }
 }
 
-export function createRecentCallRepository() {
-  return new FileRecentCallRepository();
+export function createRecentCallRepository(ownerId = 'anonymous') {
+  return new FileRecentCallRepository(ownerId.replace(/[^a-zA-Z0-9_-]/g, '_'));
 }

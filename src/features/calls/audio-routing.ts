@@ -14,11 +14,30 @@ type InCallManagerLike = {
 
 declare const require: (moduleName: string) => unknown;
 
+function unwrapDefault<T>(value: unknown): T {
+  if (value && typeof value === 'object' && 'default' in value) {
+    return (value as { default: T }).default;
+  }
+
+  return value as T;
+}
+
 function loadInCallManager() {
   try {
-    return require('react-native-incall-manager') as InCallManagerLike;
+    const manager = unwrapDefault<InCallManagerLike>(require('react-native-incall-manager'));
+
+    if (
+      !manager ||
+      typeof manager.start !== 'function' ||
+      typeof manager.setSpeakerphoneOn !== 'function' ||
+      typeof manager.stop !== 'function'
+    ) {
+      throw new Error('react-native-incall-manager-export-invalid');
+    }
+
+    return manager;
   } catch {
-    throw new Error('react-native-incall-manager is not installed. Install Phase 3 dependencies before enabling WebRTC mode.');
+    throw new Error('audio-routing-native-module-unavailable');
   }
 }
 
@@ -31,11 +50,20 @@ export class NativeAudioRoutingAdapter implements AudioRoutingAdapter {
   }
 
   setSpeakerEnabled(enabled: boolean) {
-    this.manager?.setSpeakerphoneOn(enabled);
+    try {
+      this.manager?.setSpeakerphoneOn(enabled);
+    } catch {
+      // Audio routing is best-effort after the native call has started.
+    }
   }
 
   stop() {
-    this.manager?.stop();
-    this.manager = null;
+    try {
+      this.manager?.stop();
+    } catch {
+      // Cleanup must not surface an unhandled rejection after a call ends.
+    } finally {
+      this.manager = null;
+    }
   }
 }

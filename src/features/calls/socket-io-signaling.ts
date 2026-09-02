@@ -1,9 +1,8 @@
 import {
   isCallEvent,
   type CallEvent,
-  type DevelopmentIdentity,
 } from '../../../shared/call-protocol';
-import type { SignalingTransport } from './signaling-transport';
+import type { AuthenticatedSignalingIdentity, SignalingTransport } from './signaling-transport';
 
 type SocketAck = (response: { ok: boolean; code?: string }) => void;
 
@@ -40,7 +39,7 @@ export class SocketIoSignalingTransport implements SignalingTransport {
   private readonly listeners = new Set<(event: CallEvent) => void>();
   private readonly options: Required<SocketIoSignalingOptions>;
   private socket: SocketLike | null = null;
-  private identity: DevelopmentIdentity | null = null;
+  private identity: AuthenticatedSignalingIdentity | null = null;
   private readonly handleEvent = (...args: unknown[]) => {
     const [value] = args;
     if (!isCallEvent(value)) {
@@ -58,7 +57,7 @@ export class SocketIoSignalingTransport implements SignalingTransport {
     };
   }
 
-  async connect(identity: DevelopmentIdentity) {
+  async connect(identity: AuthenticatedSignalingIdentity) {
     if (this.socket?.connected) {
       return;
     }
@@ -70,7 +69,7 @@ export class SocketIoSignalingTransport implements SignalingTransport {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: this.options.reconnectAttempts,
-      auth: { identity },
+      auth: { identity: identity.identity, token: identity.idToken },
     });
     this.socket = socket;
     socket.on('call:event', this.handleEvent);
@@ -107,7 +106,7 @@ export class SocketIoSignalingTransport implements SignalingTransport {
   }
 
   async send(event: CallEvent) {
-    if (!this.socket?.connected || !this.identity || event.from !== this.identity.id) {
+    if (!this.socket?.connected || !this.identity || event.from !== this.identity.identity.uid) {
       throw new Error('Signaling transport is not connected for this identity.');
     }
 
