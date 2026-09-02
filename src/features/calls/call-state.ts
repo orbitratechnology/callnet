@@ -42,7 +42,7 @@ const validTransitions: Record<CallState, readonly CallState[]> = {
   outgoing: ['ringing', 'connecting', 'ending', 'ended', 'failed'],
   ringing: ['connecting', 'ending', 'ended', 'failed'],
   connecting: ['connected', 'ending', 'ended', 'failed'],
-  connected: ['ending', 'failed'],
+  connected: ['ending', 'ended', 'failed'],
   ending: ['ended', 'failed'],
   ended: ['idle'],
   failed: ['idle'],

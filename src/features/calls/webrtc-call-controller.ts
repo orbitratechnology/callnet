@@ -391,8 +391,16 @@ export class WebRTCCallController {
   }
 
   private async cleanupMedia() {
-    this.audioRouter.stop();
-    await this.media.close();
+    try {
+      this.audioRouter.stop();
+    } catch {
+      // Native audio cleanup is best-effort and must not block call teardown.
+    }
+    try {
+      await this.media.close();
+    } catch {
+      // Native media cleanup is best-effort and must not block call teardown.
+    }
     this.localMedia = null;
     this.remoteStreamUrl = null;
     this.emit({ type: 'streams', localStreamUrl: null, remoteStreamUrl: null });
