@@ -1,37 +1,37 @@
 import { router } from 'expo-router';
 import {
-  createContext,
-  type PropsWithChildren,
-  useContext,
-  useEffect,
-  useReducer,
-  useRef,
-  useState,
+    createContext,
+    useContext,
+    useEffect,
+    useReducer,
+    useRef,
+    useState,
+    type PropsWithChildren,
 } from 'react';
 
-import {
-  createContactFromIdentity,
-  type DemoPerson,
-} from '../contacts/demo-people';
-import { createContactRepository, type ContactRepository, type ContactInput } from '../contacts/contacts-repository';
-import {
-  callReducer,
-  createCallSession,
-  type CallKind,
-  type CallSession,
-  type CallState,
-} from './call-state';
-import {
-  createRecentCallRepository,
-  type RecentCall,
-  type RecentCallRepository,
-} from '../recents/recent-call-repository';
-import { DemoPermissionService, type PermissionService } from './permission-service';
-import { getCallTransportMode, getIceServers, getSignalingUrl, type CallTransportMode } from './call-config';
 import { useAuth } from '../auth/auth-provider';
+import { createContactRepository, type ContactInput, type ContactRepository } from '../contacts/contacts-repository';
 import {
-  WebRTCCallController,
-  type RealCallControllerEvent,
+    createContactFromIdentity,
+    type DemoPerson,
+} from '../contacts/demo-people';
+import {
+    createRecentCallRepository,
+    type RecentCall,
+    type RecentCallRepository,
+} from '../recents/recent-call-repository';
+import { getCallTransportMode, getIceServers, getSignalingUrl, type CallTransportMode } from './call-config';
+import {
+    callReducer,
+    createCallSession,
+    type CallKind,
+    type CallSession,
+    type CallState,
+} from './call-state';
+import { DemoPermissionService, type PermissionService } from './permission-service';
+import {
+    WebRTCCallController,
+    type RealCallControllerEvent,
 } from './webrtc-call-controller';
 
 export interface CallController {
@@ -67,6 +67,7 @@ type CallProviderProps = PropsWithChildren<{
 
 const CallContext = createContext<CallContextValue | null>(null);
 const defaultPermissionService = new DemoPermissionService();
+const REAL_OUTGOING_TIMEOUT_MS = 30000;
 
 function isTerminalState(state: CallState) {
   return state === 'ended' || state === 'failed';
@@ -279,7 +280,7 @@ export function CallProvider({
       const operation = failureReason === 'rejected'
         ? controller.reject()
         : failureReason === 'cancelled' || failureReason === 'timed-out'
-          ? controller.cancel()
+          ? controller.cancel(failureReason === 'timed-out' ? 'timed-out' : 'cancelled')
           : controller.end();
       void operation.catch((error: unknown) => {
         if (!mountedRef.current) {
@@ -297,6 +298,25 @@ export function CallProvider({
 
     dispatch({ type: 'transition', state: 'ending', failureReason });
     scheduleTransition(currentSession.callId, 'ended', 220, ['ending'], failureReason);
+  };
+
+  const scheduleRealOutgoingTimeout = (callId: string) => {
+    const timer = setTimeout(() => {
+      timersRef.current.delete(timer);
+      const currentSession = sessionRef.current;
+
+      if (
+        !mountedRef.current ||
+        currentSession?.callId !== callId ||
+        !['outgoing', 'ringing', 'connecting'].includes(currentSession.state)
+      ) {
+        return;
+      }
+
+      finish('timed-out');
+    }, REAL_OUTGOING_TIMEOUT_MS);
+
+    timersRef.current.add(timer);
   };
 
   const startOutgoing = async (person: DemoPerson, kind: CallKind) => {
@@ -319,6 +339,9 @@ export function CallProvider({
           peerId: person.identityId,
           kind,
         }));
+        if (mountedRef.current && activeCallIdRef.current === call.callId) {
+          scheduleRealOutgoingTimeout(call.callId);
+        }
       } catch (error) {
         if (mountedRef.current && activeCallIdRef.current === call.callId) {
           activeCallIdRef.current = null;

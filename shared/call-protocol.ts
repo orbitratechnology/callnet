@@ -7,6 +7,7 @@ export type CallIdentity = {
 };
 
 export type CallKind = 'voice' | 'video';
+export type CallTerminationReason = 'cancelled' | 'timed-out';
 
 export type CallEventType =
   | 'call:invite'
@@ -20,7 +21,7 @@ export type CallEventType =
 
 export type CallSignalPayload =
   | { kind: 'call'; callKind: CallKind }
-  | { kind: 'empty' }
+  | { kind: 'empty'; reason?: CallTerminationReason }
   | { kind: 'session-description'; type: 'offer' | 'answer'; sdp: string }
   | {
       kind: 'ice-candidate';
@@ -72,7 +73,7 @@ function isSignalPayload(value: unknown): value is CallSignalPayload {
   }
 
   if (value.kind === 'empty') {
-    return true;
+    return value.reason === undefined || value.reason === 'cancelled' || value.reason === 'timed-out';
   }
 
   if (value.kind === 'session-description') {

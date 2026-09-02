@@ -6,6 +6,7 @@ import {
   type CallSignalPayload,
   type CallIdentity,
   type CallIdentityId,
+  type CallTerminationReason,
 } from '../../../shared/call-protocol';
 import { NativeAudioRoutingAdapter, type AudioRoutingAdapter } from './audio-routing';
 import {
@@ -173,8 +174,8 @@ export class WebRTCCallController {
     await this.finishActiveCall('call:reject', 'rejected');
   }
 
-  async cancel() {
-    await this.finishActiveCall('call:cancel', 'cancelled');
+  async cancel(reason: CallTerminationReason = 'cancelled') {
+    await this.finishActiveCall('call:cancel', reason);
   }
 
   async end() {
@@ -236,7 +237,9 @@ export class WebRTCCallController {
       const failureReason = event.type === 'call:reject'
         ? 'rejected'
         : event.type === 'call:cancel'
-          ? 'cancelled'
+          ? event.payload.kind === 'empty' && event.payload.reason === 'timed-out'
+            ? 'timed-out'
+            : 'cancelled'
           : undefined;
       await this.cleanupActiveCall();
       this.emit({ type: 'state', callId, state: 'ended', failureReason });
@@ -369,7 +372,14 @@ export class WebRTCCallController {
     }
 
     try {
-      await this.sendEvent(call.callId, call.peerId, type, { kind: 'empty' });
+      await this.sendEvent(
+        call.callId,
+        call.peerId,
+        type,
+        type === 'call:cancel'
+          ? { kind: 'empty', reason: failureReason === 'timed-out' ? 'timed-out' : 'cancelled' }
+          : { kind: 'empty' },
+      );
     } finally {
       await this.cleanupActiveCall();
       this.emit({ type: 'state', callId: call.callId, state: 'ended', failureReason });
