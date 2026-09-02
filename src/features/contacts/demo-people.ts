@@ -3,6 +3,7 @@ export type DemoPerson = {
   name: string;
   handle: string;
   initials: string;
+  photoURL?: string | null;
   accent: string;
   identityId: string;
 };
@@ -38,19 +39,29 @@ export function getDemoPerson(personId: string | undefined) {
   return demoPeople.find((person) => person.id === personId);
 }
 
-export function createContactFromIdentity(identityId: string, displayName = 'Callnet user'): DemoPerson {
-  const initials = displayName
+export function getInitials(displayName: string) {
+  return displayName
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('') || 'CN';
+}
+
+export function createContactFromIdentity(
+  identityId: string,
+  displayName = 'Unknown caller',
+  photoURL: string | null = null,
+  username = identityId.slice(0, 8).toLowerCase(),
+): DemoPerson {
+  const initials = getInitials(displayName);
 
   return {
     id: `contact-${identityId}`,
     name: displayName,
-    handle: `@${identityId.slice(0, 8)}`,
+    handle: `@${username}`,
     initials,
+    photoURL,
     accent: '#54C2A4',
     identityId,
   };

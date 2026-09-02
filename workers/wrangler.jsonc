@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "callnet-signaling",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  },
+  "vars": {
+    "FIREBASE_PROJECT_ID": "callnet-orbitra-20260902"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "USER_SESSION",
+        "class_name": "UserSession"
+      },
+      {
+        "name": "CALL_SESSION",
+        "class_name": "CallSession"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["UserSession", "CallSession"]
+    }
+  ]
+}

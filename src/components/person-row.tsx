@@ -7,11 +7,12 @@ import { Colors, Radius, Spacing } from '@/constants/theme';
 export type PersonRowProps = {
   name: string;
   initials: string;
+  photoURL?: string | null;
   detail?: string;
   onPress?: () => void;
 };
 
-export function PersonRow({ name, initials, detail, onPress }: PersonRowProps) {
+export function PersonRow({ name, initials, photoURL, detail, onPress }: PersonRowProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -19,7 +20,7 @@ export function PersonRow({ name, initials, detail, onPress }: PersonRowProps) {
       onPress={onPress}
       style={({ pressed }) => [styles.row, { opacity: pressed ? 0.72 : 1 }]}
     >
-      <Avatar initials={initials} size="sm" />
+      <Avatar initials={initials} photoURL={photoURL} size="sm" />
       <View style={styles.copy}>
         <ThemedText variant="headline">{name}</ThemedText>
         {detail ? <ThemedText variant="subhead" tone="secondary">{detail}</ThemedText> : null}

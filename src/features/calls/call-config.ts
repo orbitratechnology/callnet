@@ -1,11 +1,11 @@
 export type CallTransportMode = 'demo' | 'webrtc';
 
 export function getCallTransportMode(): CallTransportMode {
-  return process.env.EXPO_PUBLIC_CALL_MODE === 'webrtc' ? 'webrtc' : 'demo';
+  return process.env.EXPO_PUBLIC_CALL_MODE === 'demo' ? 'demo' : 'webrtc';
 }
 
 export function getSignalingUrl() {
-  return process.env.EXPO_PUBLIC_SIGNALING_URL ?? 'http://127.0.0.1:8787';
+  return process.env.EXPO_PUBLIC_SIGNALING_URL ?? 'wss://callnet-signaling.orbitra-technology.workers.dev';
 }
 
 export function getIceServers() {

@@ -1,4 +1,5 @@
-import { isCallEvent, isCallIdentity, type CallIdentity } from '../shared/call-protocol';
+import { createCallEvent, isCallEvent, isCallIdentity, type CallIdentity } from '../shared/call-protocol';
+import { CallSessionRegistry } from './call-session-registry';
 import { verifyFirebaseIdToken } from './firebase-token-verifier';
 
 type Ack = (response: { ok: boolean; code?: string }) => void;
@@ -27,6 +28,8 @@ const { Server } = require('socket.io') as {
 const port = Number(process.env.PORT ?? '8787');
 const projectId = process.env.FIREBASE_PROJECT_ID ?? 'callnet-orbitra-20260902';
 const socketsByIdentity = new Map<CallIdentity['uid'], SocketLike>();
+const sessions = new CallSessionRegistry();
+const MAX_EVENT_SKEW_MS = 5 * 60 * 1000;
 const io = new Server({
   cors: { origin: '*' },
   transports: ['websocket'],
@@ -41,7 +44,7 @@ io.use?.((socket, next) => {
     ? (auth as { token?: unknown }).token
     : undefined;
 
-  if (!isCallIdentity(rawIdentity) || typeof token !== 'string' || token.length === 0) {
+  if (!isCallIdentity(rawIdentity) || typeof token !== 'string' || token.length === 0 || token.length > 10_000) {
     next(new Error('unauthorized'));
     return;
   }
@@ -75,14 +78,32 @@ io.on('connection', (socket) => {
     const [value, rawAck] = args;
     const ack = typeof rawAck === 'function' ? rawAck as Ack : undefined;
 
-    if (!isCallEvent(value) || value.from !== identity.uid) {
+    if (
+      !isCallEvent(value) ||
+      value.from !== identity.uid ||
+      Math.abs(Date.now() - value.timestamp) > MAX_EVENT_SKEW_MS
+    ) {
       console.warn(`[signaling] invalid event uid=${identity.uid.slice(0, 8)}`);
       ack?.({ ok: false, code: 'invalid-call-event' });
       return;
     }
 
+    const decision = sessions.apply(value);
+    if (!decision.ok) {
+      ack?.({ ok: false, code: decision.code });
+      return;
+    }
+
+    if (!decision.relay) {
+      ack?.({ ok: true, code: decision.code });
+      return;
+    }
+
     const peer = socketsByIdentity.get(value.to);
     if (!peer) {
+      if (value.type === 'call:invite') {
+        sessions.closeForUser(identity.uid);
+      }
       console.warn(`[signaling] peer offline from=${identity.uid.slice(0, 8)} to=${value.to.slice(0, 8)} type=${value.type}`);
       ack?.({ ok: false, code: 'peer-offline' });
       return;
@@ -97,6 +118,18 @@ io.on('connection', (socket) => {
     console.log(`[signaling] disconnected uid=${identity.uid.slice(0, 8)}`);
     if (socketsByIdentity.get(identity.uid) === socket) {
       socketsByIdentity.delete(identity.uid);
+      const session = sessions.closeForUser(identity.uid);
+      if (session) {
+        const peerId = session.callerId === identity.uid ? session.calleeId : session.callerId;
+        const peer = socketsByIdentity.get(peerId);
+        peer?.emit('call:event', createCallEvent({
+          type: 'call:end',
+          callId: session.callId,
+          from: identity.uid,
+          to: peerId,
+          payload: { kind: 'empty' },
+        }));
+      }
     }
   });
 });

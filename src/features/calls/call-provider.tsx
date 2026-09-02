@@ -13,8 +13,10 @@ import { useAuth } from '../auth/auth-provider';
 import { createContactRepository, type ContactInput, type ContactRepository } from '../contacts/contacts-repository';
 import {
     createContactFromIdentity,
+    getInitials,
     type DemoPerson,
 } from '../contacts/demo-people';
+import { ensureUserProfile } from '../profile/profile-service';
 import {
     createRecentCallRepository,
     type RecentCall,
@@ -114,14 +116,20 @@ export function CallProvider({
 
   sessionRef.current = session;
 
-  const getRealController = (idToken: string) => {
+  const getRealController = async (idToken: string) => {
     if (!user) {
       throw new Error('Sign in before connecting to calls.');
     }
     if (!realControllerRef.current) {
+      const profile = await ensureUserProfile(user);
       realControllerRef.current = new WebRTCCallController({
         identity: { mode: 'firebase', uid: user.uid },
         authToken: idToken,
+        profile: {
+          username: profile.username,
+          displayName: profile.displayName,
+          photoURL: profile.photoURL,
+        },
         signalingUrl: getSignalingUrl(),
         iceServers: getIceServers(),
       });
@@ -177,8 +185,21 @@ export function CallProvider({
     }
 
     if (event.type === 'incoming') {
-      const person = contacts.find((contact) => contact.identityId === event.from)
-        ?? createContactFromIdentity(event.from);
+      const existingContact = contacts.find((contact) => contact.identityId === event.from);
+      const person = existingContact
+        ? {
+            ...existingContact,
+            name: event.profile.displayName,
+            handle: `@${event.profile.username}`,
+            initials: getInitials(event.profile.displayName),
+            photoURL: event.profile.photoURL,
+          }
+        : createContactFromIdentity(
+            event.from,
+            event.profile.displayName,
+            event.profile.photoURL,
+            event.profile.username,
+          );
       if (sessionRef.current && isActiveState(sessionRef.current.state)) {
         return;
       }

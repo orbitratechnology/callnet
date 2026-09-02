@@ -102,6 +102,7 @@ export default function HomeScreen() {
           <PersonRow
             name={item.person.name}
             initials={item.person.initials}
+            photoURL={item.person.photoURL}
             detail={getRecentCallDetail(item)}
             onPress={() => router.push({ pathname: '/call', params: { personId: item.person.id } })}
           />

@@ -3,6 +3,7 @@ import {
   type CallEvent,
   type CallEventType,
   type CallKind,
+  type CallProfile,
   type CallSignalPayload,
   type CallIdentity,
   type CallIdentityId,
@@ -17,17 +18,18 @@ import {
   type MediaStreamLike,
   type SessionDescription,
 } from './media-engine';
-import { SocketIoSignalingTransport } from './socket-io-signaling';
 import type { SignalingTransport } from './signaling-transport';
+import { WebSocketSignalingTransport } from './websocket-signaling';
 
 export type RealCallControllerEvent =
-  | { type: 'incoming'; callId: string; kind: CallKind; from: CallIdentityId; timestamp: number }
+  | { type: 'incoming'; callId: string; kind: CallKind; from: CallIdentityId; profile: CallProfile; timestamp: number }
   | { type: 'state'; callId: string; state: 'connecting' | 'connected' | 'ended' | 'failed'; failureReason?: string }
   | { type: 'streams'; localStreamUrl: string | null; remoteStreamUrl: string | null };
 
 export type WebRTCCallControllerOptions = {
   identity: CallIdentity;
   authToken: string;
+  profile: CallProfile;
   signalingUrl: string;
   iceServers?: Array<{ urls: string | string[]; username?: string; credential?: string }>;
   transport?: SignalingTransport;
@@ -51,6 +53,7 @@ function getErrorMessage(error: unknown) {
 export class WebRTCCallController {
   private readonly identity: CallIdentity;
   private readonly authToken: string;
+  private readonly profile: CallProfile;
   private readonly transport: SignalingTransport;
   private readonly media: MediaEngine;
   private readonly audioRouter: AudioRoutingAdapter;
@@ -66,7 +69,8 @@ export class WebRTCCallController {
   constructor(options: WebRTCCallControllerOptions) {
     this.identity = options.identity;
     this.authToken = options.authToken;
-    this.transport = options.transport ?? new SocketIoSignalingTransport({ url: options.signalingUrl });
+    this.profile = options.profile;
+    this.transport = options.transport ?? new WebSocketSignalingTransport({ url: options.signalingUrl });
     this.audioRouter = options.audioRouter ?? new NativeAudioRoutingAdapter();
     this.media = options.mediaEngine ?? new NativeWebRTCMediaEngine({
       iceServers: options.iceServers,
@@ -117,6 +121,7 @@ export class WebRTCCallController {
       await this.sendEvent(input.callId, input.peerId, 'call:invite', {
         kind: 'call',
         callKind: input.kind,
+        profile: this.profile,
       });
       this.emit({ type: 'state', callId: input.callId, state: 'connecting' });
       let offer: SessionDescription;
@@ -287,6 +292,7 @@ export class WebRTCCallController {
       callId: event.callId,
       kind: event.payload.callKind,
       from: event.from,
+      profile: event.payload.profile,
       timestamp: event.timestamp,
     });
   }

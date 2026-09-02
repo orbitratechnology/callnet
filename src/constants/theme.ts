@@ -36,8 +36,8 @@ export const Colors = {
 } as const;
 
 export const BrandColors = {
-  light: { accent: '#111111', accentSoft: '#dddddd', accentContrast: '#0F403A' },
-  dark: { accent: '#eeeeee', accentSoft: '#aaaaaa', accentContrast: '#E8FFFA' },
+  light: { accent: '#197A6E', accentSoft: '#DDF3EE', accentContrast: '#0F403A' },
+  dark: { accent: '#61C8B6', accentSoft: '#173F39', accentContrast: '#E8FFFA' },
 } as const;
 
 export function useBrandColors() {

@@ -1,4 +1,4 @@
-export const CALL_PROTOCOL_VERSION = 1 as const;
+export const CALL_PROTOCOL_VERSION = 2 as const;
 
 export type CallIdentityId = string;
 export type CallIdentity = {
@@ -8,6 +8,11 @@ export type CallIdentity = {
 
 export type CallKind = 'voice' | 'video';
 export type CallTerminationReason = 'cancelled' | 'timed-out';
+export type CallProfile = {
+  username: string;
+  displayName: string;
+  photoURL: string | null;
+};
 
 export type CallEventType =
   | 'call:invite'
@@ -20,7 +25,7 @@ export type CallEventType =
   | 'webrtc:ice-candidate';
 
 export type CallSignalPayload =
-  | { kind: 'call'; callKind: CallKind }
+  | { kind: 'call'; callKind: CallKind; profile: CallProfile }
   | { kind: 'empty'; reason?: CallTerminationReason }
   | { kind: 'session-description'; type: 'offer' | 'answer'; sdp: string }
   | {
@@ -63,13 +68,28 @@ function isCallKind(value: unknown): value is CallKind {
   return value === 'voice' || value === 'video';
 }
 
+function isCallProfile(value: unknown): value is CallProfile {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.username === 'string' &&
+    /^[a-z0-9](?:[a-z0-9._-]{1,28}[a-z0-9])?$/.test(value.username) &&
+    typeof value.displayName === 'string' &&
+    value.displayName.length >= 1 &&
+    value.displayName.length <= 80 &&
+    (value.photoURL === null || (typeof value.photoURL === 'string' && value.photoURL.length <= 2048))
+  );
+}
+
 function isSignalPayload(value: unknown): value is CallSignalPayload {
   if (!isRecord(value) || typeof value.kind !== 'string') {
     return false;
   }
 
   if (value.kind === 'call') {
-    return isCallKind(value.callKind);
+    return isCallKind(value.callKind) && isCallProfile(value.profile);
   }
 
   if (value.kind === 'empty') {

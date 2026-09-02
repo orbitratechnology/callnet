@@ -5,15 +5,17 @@ import { FlatList, StyleSheet, TextInput, View } from 'react-native';
 import { PersonRow } from '@/components/person-row';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { type ContactInput } from '@/features/contacts/contacts-repository';
 import { useCall } from '@/features/calls/call-provider';
+import type { DemoPerson } from '@/features/contacts/demo-people';
+import { findUserProfileByUsername, type UserProfile } from '@/features/profile/profile-service';
+import { useAuth } from '@/features/auth/auth-provider';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 
 function PersonListHeader({ count }: { count: number }) {
   return (
     <View style={styles.header}>
       <ThemedText variant="body" tone="secondary">
-        {count > 0 ? 'Choose someone you know.' : 'Add someone using their Callnet User ID.'}
+        {count > 0 ? 'Choose someone you know.' : 'Find someone using their Callnet username.'}
       </ThemedText>
     </View>
   );
@@ -29,66 +31,91 @@ function getInitials(name: string) {
     .join('') || 'CN';
 }
 
-function AddContactForm({ onAdd }: { onAdd: (contact: ContactInput) => void }) {
-  const [name, setName] = useState('');
-  const [userId, setUserId] = useState('');
+function AddContactForm({ onAdd, ownerUid }: { onAdd: (contact: Omit<DemoPerson, 'id'>) => void; ownerUid: string }) {
+  const [username, setUsername] = useState('');
+  const [result, setResult] = useState<UserProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const submit = () => {
-    const normalizedName = name.trim();
-    const normalizedUserId = userId.trim();
-    if (!normalizedName || !normalizedUserId) {
-      setError('Enter a name and User ID.');
+  const submit = async () => {
+    const normalizedUsername = username.trim();
+    if (!normalizedUsername) {
+      setError('Enter a username.');
       return;
     }
-    if (normalizedUserId.length > 128) {
-      setError('That User ID is too long.');
-      return;
-    }
-
-    onAdd({
-      name: normalizedName,
-      handle: `@${normalizedUserId.slice(0, 8)}`,
-      initials: getInitials(normalizedName),
-      accent: '#54C2A4',
-      identityId: normalizedUserId,
-    });
-    setName('');
-    setUserId('');
     setError(null);
+    setResult(null);
+    setIsSearching(true);
+    try {
+      const profile = await findUserProfileByUsername(normalizedUsername);
+      if (!profile) {
+        setError('No Callnet user was found with that username.');
+        return;
+      }
+      if (profile.uid === ownerUid) {
+        setError('You cannot add yourself as a call contact.');
+        return;
+      }
+      setResult(profile);
+    } catch {
+      setError('Could not search Callnet right now. Try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const addResult = () => {
+    if (!result) {
+      return;
+    }
+    onAdd({
+      name: result.displayName,
+      handle: `@${result.username}`,
+      initials: getInitials(result.displayName),
+      photoURL: result.photoURL,
+      accent: '#54C2A4',
+      identityId: result.uid,
+    });
+    setUsername('');
+    setResult(null);
   };
 
   return (
     <View style={styles.addCard}>
-      <ThemedText variant="headline">Add a contact</ThemedText>
+      <ThemedText variant="headline">Find a Callnet user</ThemedText>
       <ThemedText variant="subhead" tone="secondary">
-        Ask the person to share the User ID shown in their Profile.
+        Ask the person to share their username. Only exact matches are returned.
       </ThemedText>
       <TextInput
-        value={name}
-        onChangeText={setName}
-        placeholder="Name"
-        placeholderTextColor={Colors.secondaryLabel}
-        style={styles.input}
-        autoCapitalize="words"
-      />
-      <TextInput
-        value={userId}
-        onChangeText={setUserId}
-        placeholder="Callnet User ID"
+        value={username}
+        onChangeText={setUsername}
+        placeholder="Username"
         placeholderTextColor={Colors.secondaryLabel}
         style={styles.input}
         autoCapitalize="none"
         autoCorrect={false}
       />
       {error ? <ThemedText variant="subhead" tone="destructive">{error}</ThemedText> : null}
-      <Button title="Save contact" size="sm" onPress={submit} />
+      {result ? (
+        <View style={styles.result}>
+          <PersonRow
+            name={result.displayName}
+            initials={getInitials(result.displayName)}
+            photoURL={result.photoURL}
+            detail={`@${result.username}`}
+            onPress={addResult}
+          />
+          <Button title="Add to contacts" size="sm" onPress={addResult} />
+        </View>
+      ) : null}
+      <Button title="Find user" size="sm" loading={isSearching} onPress={() => void submit()} />
     </View>
   );
 }
 
 export default function SelectPersonScreen() {
   const { contacts, addContact } = useCall();
+  const { user } = useAuth();
 
   return (
     <>
@@ -100,12 +127,13 @@ export default function SelectPersonScreen() {
         contentContainerStyle={styles.content}
         ItemSeparatorComponent={PersonSeparator}
         ListHeaderComponent={<PersonListHeader count={contacts.length} />}
-        ListFooterComponent={<AddContactForm onAdd={addContact} />}
+        ListFooterComponent={<AddContactForm onAdd={addContact} ownerUid={user?.uid ?? ''} />}
         renderItem={({ item: person }) => (
           <PersonRow
             name={person.name}
             initials={person.initials}
-            detail="Ready to call"
+            photoURL={person.photoURL}
+            detail={person.handle}
             onPress={() => router.push({ pathname: '/call', params: { personId: person.id } })}
           />
         )}
@@ -129,6 +157,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     backgroundColor: Colors.secondaryBackground,
   },
+  result: { gap: Spacing.sm },
   input: {
     minHeight: 48,
     paddingHorizontal: Spacing.md,

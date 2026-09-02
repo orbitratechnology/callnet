@@ -153,7 +153,7 @@ export default function CallScreen() {
       </View>
 
       <View style={styles.identity}>
-        <Avatar initials={selectedPerson.initials} size="lg" />
+        <Avatar initials={selectedPerson.initials} photoURL={selectedPerson.photoURL} size="lg" />
         <ThemedText variant="title" style={styles.centered}>{selectedPerson.name}</ThemedText>
         <ThemedText variant="body" tone="secondary" style={styles.centered}>
           {isBusyWithAnotherPerson

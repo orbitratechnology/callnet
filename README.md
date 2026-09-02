@@ -1,6 +1,6 @@
 # Callnet
 
-Callnet is an Expo SDK 57 one-to-one voice and video calling app. The app uses Firebase email/password authentication and Firebase UID-based Socket.IO signaling. Native WebRTC runs in an Expo development build, not Expo Go.
+Callnet is an Expo SDK 57 one-to-one voice and video calling app. The app uses Firebase email/password or Google authentication and Firebase UID-based Socket.IO signaling. Native WebRTC runs in an Expo development build, not Expo Go.
 
 ## Local setup
 
@@ -18,9 +18,9 @@ For physical devices, `EXPO_PUBLIC_SIGNALING_URL` must resolve to the signaling 
 
 ## Authenticated calling flow
 
-Create or sign in to a real Firebase email/password account on each device. From Profile, copy the other account's Firebase UID, add it as a contact, and start a voice or video call. No development identity is accepted by the authenticated signaling server.
+Create or sign in to a real Firebase email/password or Google account on each device. Email accounts choose a username; Google accounts receive a readable handle derived from the Google name or account email. Find the other person by exact username, then start a voice or video call. No development identity is accepted by the authenticated signaling server.
 
-Native Google sign-in and Firestore-backed user discovery are intentionally deferred to the next Firebase subphase. The web adapter already contains the Google popup path.
+Native Google sign-in uses the registered Firebase Android/iOS apps and the web OAuth client ID. The first native run requires a fresh development build after the Google Sign-In package/config plugin is added.
 
 Keep TURN credentials and Firebase admin credentials out of source control. Firebase client configuration is public client configuration; the signaling server must use Firebase ID-token verification and must never receive a service-account key in the mobile app.
 

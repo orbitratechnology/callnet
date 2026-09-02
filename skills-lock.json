@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "react-native-nitro-google-signin": {
+      "source": "react-native-nitro-google-sign-in/google-signin",
+      "sourceType": "github",
+      "skillPath": "skills/react-native-nitro-google-signin/SKILL.md",
+      "computedHash": "9dc18ef90b5b8625c486c95001602d1cc2357fcd997570ec50c6fc8592c3e2ca"
+    }
+  }
+}
