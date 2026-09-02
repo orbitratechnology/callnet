@@ -273,6 +273,8 @@ const styles = StyleSheet.create({
   actions: { gap: Spacing.sm, paddingBottom: Spacing.md },
   controlRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.md, paddingBottom: Spacing.sm },
   videoStage: {
+    width: '100%',
+    aspectRatio: 4 / 3,
     minHeight: 220,
     alignItems: 'center',
     justifyContent: 'center',

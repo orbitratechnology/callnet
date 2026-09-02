@@ -106,6 +106,8 @@ export function CallProvider({
   const recordedCallIdsRef = useRef<Set<string>>(new Set());
   const startingCallRef = useRef(false);
   const activeCallIdRef = useRef<string | null>(null);
+  const mountedRef = useRef(false);
+  const pendingIncomingRouteRef = useRef<string | null>(null);
   const realControllerRef = useRef<WebRTCCallController | null>(null);
   const transportMode = getCallTransportMode();
 
@@ -145,6 +147,7 @@ export function CallProvider({
       const currentSession = sessionRef.current;
 
       if (
+        !mountedRef.current ||
         currentSession?.callId !== callId ||
         !expectedStates.includes(currentSession.state)
       ) {
@@ -168,6 +171,10 @@ export function CallProvider({
   };
 
   const handleRealEvent = (event: RealCallControllerEvent) => {
+    if (!mountedRef.current) {
+      return;
+    }
+
     if (event.type === 'incoming') {
       const person = contacts.find((contact) => contact.identityId === event.from)
         ?? createContactFromIdentity(event.from);
@@ -177,8 +184,8 @@ export function CallProvider({
 
       const call = createCallSession(person, event.kind, 'incoming', event.timestamp, event.callId);
       activeCallIdRef.current = call.callId;
+      pendingIncomingRouteRef.current = person.id;
       dispatch({ type: 'start', session: call });
-      router.push({ pathname: '/call', params: { personId: person.id } });
       return;
     }
 
@@ -199,6 +206,28 @@ export function CallProvider({
   };
 
   useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const personId = pendingIncomingRouteRef.current;
+    if (
+      !personId ||
+      session?.direction !== 'incoming' ||
+      session.state !== 'ringing'
+    ) {
+      return;
+    }
+
+    pendingIncomingRouteRef.current = null;
+    router.push({ pathname: '/call', params: { personId } });
+  }, [session?.callId, session?.direction, session?.state]);
+
+  useEffect(() => {
     if (transportMode !== 'webrtc' || !user) {
       return;
     }
@@ -217,7 +246,7 @@ export function CallProvider({
         return controller.connect();
       })
       .catch((error: unknown) => {
-        if (!cancelled) {
+        if (!cancelled && mountedRef.current) {
           setTransportError(error instanceof Error ? error.message : 'Signaling connection failed.');
         }
       });
@@ -253,6 +282,10 @@ export function CallProvider({
           ? controller.cancel()
           : controller.end();
       void operation.catch((error: unknown) => {
+        if (!mountedRef.current) {
+          return;
+        }
+
         dispatch({
           type: 'transition',
           state: 'failed',
@@ -287,7 +320,7 @@ export function CallProvider({
           kind,
         }));
       } catch (error) {
-        if (activeCallIdRef.current === call.callId) {
+        if (mountedRef.current && activeCallIdRef.current === call.callId) {
           activeCallIdRef.current = null;
           dispatch({
             type: 'transition',
@@ -360,6 +393,10 @@ export function CallProvider({
       try {
         await getConnectedController().then((controller) => controller.acceptIncoming());
       } catch (error) {
+        if (!mountedRef.current) {
+          return;
+        }
+
         dispatch({
           type: 'transition',
           state: 'failed',
