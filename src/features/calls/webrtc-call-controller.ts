@@ -20,10 +20,12 @@ import {
 } from './media-engine';
 import type { SignalingTransport } from './signaling-transport';
 import { WebSocketSignalingTransport } from './websocket-signaling';
+import { nativeCallUi, type NativeCallUi, type NativeCallUiEvent } from './native-call-ui';
 
 export type RealCallControllerEvent =
   | { type: 'incoming'; callId: string; kind: CallKind; from: CallIdentityId; profile: CallProfile; timestamp: number }
   | { type: 'state'; callId: string; state: 'connecting' | 'connected' | 'ended' | 'failed'; failureReason?: string }
+  | { type: 'controls'; callId: string; muted?: boolean; cameraEnabled?: boolean }
   | { type: 'streams'; localStreamUrl: string | null; remoteStreamUrl: string | null };
 
 export type WebRTCCallControllerOptions = {
@@ -35,6 +37,7 @@ export type WebRTCCallControllerOptions = {
   transport?: SignalingTransport;
   mediaEngine?: MediaEngine;
   audioRouter?: AudioRoutingAdapter;
+  nativeCallUi?: NativeCallUi;
 };
 
 type ActiveCall = {
@@ -44,6 +47,7 @@ type ActiveCall = {
   direction: 'incoming' | 'outgoing';
   state: 'ringing' | 'connecting' | 'connected';
   remoteDescriptionSet: boolean;
+  nativeAnswerRequestId?: string;
 };
 
 function getErrorMessage(error: unknown) {
@@ -57,6 +61,7 @@ export class WebRTCCallController {
   private readonly transport: SignalingTransport;
   private readonly media: MediaEngine;
   private readonly audioRouter: AudioRoutingAdapter;
+  private readonly nativeCallUi: NativeCallUi;
   private readonly listeners = new Set<(event: RealCallControllerEvent) => void>();
   private readonly pendingIceCandidates: IceCandidate[] = [];
   private activeCall: ActiveCall | null = null;
@@ -65,6 +70,8 @@ export class WebRTCCallController {
   private remoteStreamUrl: string | null = null;
   private isConnected = false;
   private unsubscribeFromTransport: (() => void) | null = null;
+  private unsubscribeFromNativeCallUi: (() => void) | null = null;
+  private readonly finishingCallIds = new Set<string>();
 
   constructor(options: WebRTCCallControllerOptions) {
     this.identity = options.identity;
@@ -72,6 +79,8 @@ export class WebRTCCallController {
     this.profile = options.profile;
     this.transport = options.transport ?? new WebSocketSignalingTransport({ url: options.signalingUrl });
     this.audioRouter = options.audioRouter ?? new NativeAudioRoutingAdapter();
+    this.nativeCallUi = options.nativeCallUi ?? nativeCallUi;
+    this.nativeCallUi.initialize();
     this.media = options.mediaEngine ?? new NativeWebRTCMediaEngine({
       iceServers: options.iceServers,
       onIceCandidate: (candidate) => {
@@ -86,9 +95,32 @@ export class WebRTCCallController {
       return;
     }
 
+    this.unsubscribeFromNativeCallUi = this.nativeCallUi.subscribe((event) => {
+      void this.handleNativeCallUiEvent(event).catch(() => undefined);
+    });
     this.unsubscribeFromTransport = this.transport.subscribe((event) => void this.handleEvent(event));
     await this.transport.connect({ identity: this.identity, idToken: this.authToken });
     this.isConnected = true;
+
+    const restoredIncomingCall = await this.nativeCallUi.getActiveIncomingCall();
+    if (restoredIncomingCall && !this.activeCall) {
+      this.activeCall = {
+        callId: restoredIncomingCall.serverCallId,
+        peerId: restoredIncomingCall.peerId,
+        kind: restoredIncomingCall.kind,
+        direction: 'incoming',
+        state: 'ringing',
+        remoteDescriptionSet: false,
+      };
+      this.emit({
+        type: 'incoming',
+        callId: restoredIncomingCall.serverCallId,
+        kind: restoredIncomingCall.kind,
+        from: restoredIncomingCall.peerId,
+        profile: restoredIncomingCall.profile,
+        timestamp: restoredIncomingCall.timestamp,
+      });
+    }
   }
 
   subscribe(listener: (event: RealCallControllerEvent) => void) {
@@ -96,7 +128,12 @@ export class WebRTCCallController {
     return () => this.listeners.delete(listener);
   }
 
-  async startOutgoing(input: { callId: string; peerId: CallIdentityId; kind: CallKind }) {
+  async startOutgoing(input: {
+    callId: string;
+    peerId: CallIdentityId;
+    kind: CallKind;
+    peerProfile?: CallProfile;
+  }) {
     await this.connect();
     if (this.activeCall) {
       throw new Error('A WebRTC call is already active.');
@@ -112,6 +149,12 @@ export class WebRTCCallController {
     };
 
     try {
+      await this.nativeCallUi.startOutgoing(
+        input.callId,
+        input.peerId,
+        input.peerProfile ?? { username: 'callnet-user', displayName: 'Callnet user', photoURL: null },
+        input.kind,
+      );
       await this.startLocalMedia(input.kind);
       try {
         this.audioRouter.start(input.kind);
@@ -144,22 +187,26 @@ export class WebRTCCallController {
     }
   }
 
-  async acceptIncoming() {
+  async acceptIncoming(nativeAnswerRequestId?: string) {
     const call = this.activeCall;
     if (!call || call.direction !== 'incoming' || call.state !== 'ringing') {
       return;
     }
 
     try {
+      call.state = 'connecting';
+      call.nativeAnswerRequestId = nativeAnswerRequestId;
+      this.emit({ type: 'state', callId: call.callId, state: 'connecting' });
+      if (!nativeAnswerRequestId) {
+        await this.nativeCallUi.answerIncoming(call.callId);
+      }
       await this.startLocalMedia(call.kind);
       try {
         this.audioRouter.start(call.kind);
       } catch (error) {
         throw new Error(`audio-routing-start:${getErrorMessage(error)}`);
       }
-      call.state = 'connecting';
       await this.sendEvent(call.callId, call.peerId, 'call:accept', { kind: 'empty' });
-      this.emit({ type: 'state', callId: call.callId, state: 'connecting' });
 
       if (this.pendingOffer) {
         const offer = this.pendingOffer;
@@ -188,12 +235,28 @@ export class WebRTCCallController {
   }
 
   setMuted(muted: boolean) {
+    this.applyMuted(muted);
+    const call = this.activeCall;
+    if (call) {
+      void this.nativeCallUi.setMuted(call.callId, muted).catch(() => undefined);
+    }
+  }
+
+  private applyMuted(muted: boolean) {
     (this.localMedia?.stream.getTracks?.() ?? []).forEach((track) => {
       if (!track.kind || track.kind === 'audio') track.enabled = !muted;
     });
   }
 
   setCameraEnabled(enabled: boolean) {
+    this.applyCameraEnabled(enabled);
+    const call = this.activeCall;
+    if (call) {
+      void this.nativeCallUi.reportVideo(call.callId, enabled).catch(() => undefined);
+    }
+  }
+
+  private applyCameraEnabled(enabled: boolean) {
     (this.localMedia?.stream.getTracks?.() ?? []).forEach((track) => {
       if (track.kind === 'video') track.enabled = enabled;
     });
@@ -210,6 +273,8 @@ export class WebRTCCallController {
   }
 
   async disconnect() {
+    this.unsubscribeFromNativeCallUi?.();
+    this.unsubscribeFromNativeCallUi = null;
     this.unsubscribeFromTransport?.();
     this.unsubscribeFromTransport = null;
     this.isConnected = false;
@@ -246,6 +311,7 @@ export class WebRTCCallController {
             ? 'timed-out'
             : 'cancelled'
           : undefined;
+      await this.nativeCallUi.reportEnded(callId, 'remoteEnded').catch(() => undefined);
       await this.cleanupActiveCall();
       this.emit({ type: 'state', callId, state: 'ended', failureReason });
       return;
@@ -287,6 +353,13 @@ export class WebRTCCallController {
       state: 'ringing',
       remoteDescriptionSet: false,
     };
+    await this.nativeCallUi.reportIncoming(
+      event.callId,
+      event.from,
+      event.payload.profile,
+      event.payload.callKind,
+      event.timestamp,
+    ).catch(() => undefined);
     this.emit({
       type: 'incoming',
       callId: event.callId,
@@ -313,6 +386,12 @@ export class WebRTCCallController {
     });
     this.activeCall.state = 'connected';
     this.emit({ type: 'state', callId: event.callId, state: 'connected' });
+    void this.nativeCallUi.reportConnected(
+      event.callId,
+      'incoming',
+      this.activeCall.nativeAnswerRequestId,
+    ).catch(() => undefined);
+    this.activeCall.nativeAnswerRequestId = undefined;
   }
 
   private async handleAnswer(event: CallEvent) {
@@ -325,6 +404,7 @@ export class WebRTCCallController {
     await this.flushIceCandidates();
     this.activeCall.state = 'connected';
     this.emit({ type: 'state', callId: event.callId, state: 'connected' });
+    void this.nativeCallUi.reportConnected(event.callId, 'outgoing').catch(() => undefined);
   }
 
   private async startLocalMedia(kind: CallKind) {
@@ -371,13 +451,21 @@ export class WebRTCCallController {
     }));
   }
 
-  private async finishActiveCall(type: 'call:reject' | 'call:cancel' | 'call:end', failureReason?: string) {
+  private async finishActiveCall(
+    type: 'call:reject' | 'call:cancel' | 'call:end',
+    failureReason?: string,
+    skipNativeCallUi = false,
+  ) {
     const call = this.activeCall;
     if (!call) {
       return;
     }
 
+    this.finishingCallIds.add(call.callId);
     try {
+      if (!skipNativeCallUi) {
+        await this.nativeCallUi.end(call.callId).catch(() => undefined);
+      }
       await this.sendEvent(
         call.callId,
         call.peerId,
@@ -389,12 +477,66 @@ export class WebRTCCallController {
     } finally {
       await this.cleanupActiveCall();
       this.emit({ type: 'state', callId: call.callId, state: 'ended', failureReason });
+      this.finishingCallIds.delete(call.callId);
     }
   }
 
   private async failActiveCall(callId: string, failureReason: string) {
+    const call = this.activeCall;
+    if (call?.nativeAnswerRequestId) {
+      await this.nativeCallUi.failIncoming(callId, call.nativeAnswerRequestId).catch(() => undefined);
+    } else {
+      await this.nativeCallUi.reportEnded(callId, 'failed').catch(() => undefined);
+    }
     await this.cleanupActiveCall();
     this.emit({ type: 'state', callId, state: 'failed', failureReason });
+  }
+
+  private async handleNativeCallUiEvent(event: NativeCallUiEvent) {
+    const call = this.activeCall;
+
+    if (event.type === 'answered') {
+      if (!call || (event.serverCallId && event.serverCallId !== call.callId) || call.direction !== 'incoming') {
+        return;
+      }
+      if (call.state === 'ringing') {
+        await this.acceptIncoming(event.requestId);
+      } else if ((call.state === 'connecting' || call.state === 'connected') && !call.nativeAnswerRequestId) {
+        call.nativeAnswerRequestId = event.requestId;
+        if (call.state === 'connected') {
+          void this.nativeCallUi.reportConnected(call.callId, 'incoming', event.requestId).catch(() => undefined);
+        }
+      }
+      return;
+    }
+
+    if (event.type === 'ended') {
+      if (!call || (event.serverCallId && event.serverCallId !== call.callId)) {
+        return;
+      }
+      if (this.finishingCallIds.has(call.callId)) {
+        return;
+      }
+      await this.finishActiveCall(
+        call.direction === 'incoming' && call.state === 'ringing' ? 'call:reject' : 'call:end',
+        call.direction === 'incoming' && call.state === 'ringing' ? 'rejected' : undefined,
+        true,
+      );
+      return;
+    }
+
+    if (!call) {
+      return;
+    }
+
+    if (event.type === 'muted') {
+      this.applyMuted(event.muted);
+      this.emit({ type: 'controls', callId: call.callId, muted: event.muted });
+      return;
+    }
+
+    this.applyCameraEnabled(event.hasVideo);
+    this.emit({ type: 'controls', callId: call.callId, cameraEnabled: event.hasVideo });
   }
 
   private async cleanupActiveCall() {

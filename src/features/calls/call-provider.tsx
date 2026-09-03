@@ -35,6 +35,7 @@ import {
     WebRTCCallController,
     type RealCallControllerEvent,
 } from './webrtc-call-controller';
+import { setupVoipPushForUser } from './voip-push-service';
 
 export interface CallController {
   startOutgoing(person: DemoPerson, kind: CallKind): Promise<void>;
@@ -217,6 +218,16 @@ export function CallProvider({
       return;
     }
 
+    if (event.type === 'controls') {
+      if (event.muted !== undefined) {
+        dispatch({ type: 'set-mute', muted: event.muted });
+      }
+      if (event.cameraEnabled !== undefined) {
+        dispatch({ type: 'set-camera', enabled: event.cameraEnabled });
+      }
+      return;
+    }
+
     if (sessionRef.current?.callId !== event.callId) {
       return;
     }
@@ -278,6 +289,14 @@ export function CallProvider({
       unsubscribe();
       void controller?.disconnect();
     };
+  }, [transportMode, user?.uid]);
+
+  useEffect(() => {
+    if (transportMode !== 'webrtc' || !user) {
+      return;
+    }
+
+    return setupVoipPushForUser(user.uid);
   }, [transportMode, user?.uid]);
 
   const finish = (failureReason?: string) => {
@@ -359,6 +378,11 @@ export function CallProvider({
           callId: call.callId,
           peerId: person.identityId,
           kind,
+          peerProfile: {
+            username: person.handle.replace(/^@/, ''),
+            displayName: person.name,
+            photoURL: person.photoURL ?? null,
+          },
         }));
         if (mountedRef.current && activeCallIdRef.current === call.callId) {
           scheduleRealOutgoingTimeout(call.callId);

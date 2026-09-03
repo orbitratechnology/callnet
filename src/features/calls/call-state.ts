@@ -32,8 +32,10 @@ export type CallAction =
   | { type: 'start'; session: CallSession }
   | { type: 'transition'; state: CallState; at?: number; failureReason?: string }
   | { type: 'toggle-mute' }
+  | { type: 'set-mute'; muted: boolean }
   | { type: 'toggle-speaker' }
   | { type: 'toggle-camera' }
+  | { type: 'set-camera'; enabled: boolean }
   | { type: 'switch-camera' }
   | { type: 'reset' };
 
@@ -112,12 +114,20 @@ export function callReducer(
     return { ...session, isMuted: !session.isMuted };
   }
 
+  if (action.type === 'set-mute') {
+    return { ...session, isMuted: action.muted };
+  }
+
   if (action.type === 'toggle-speaker') {
     return { ...session, isSpeakerEnabled: !session.isSpeakerEnabled };
   }
 
   if (action.type === 'toggle-camera') {
     return { ...session, isCameraEnabled: !session.isCameraEnabled };
+  }
+
+  if (action.type === 'set-camera') {
+    return { ...session, isCameraEnabled: action.enabled };
   }
 
   return { ...session, isFrontCamera: !session.isFrontCamera };

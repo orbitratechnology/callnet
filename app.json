@@ -9,7 +9,13 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio",
+          "voip"
+        ]
+      }
     },
     "android": {
       "googleServicesFile": "./google-services.json",
@@ -23,7 +29,9 @@
         "CAMERA",
         "RECORD_AUDIO",
         "MODIFY_AUDIO_SETTINGS",
-        "BLUETOOTH_CONNECT"
+        "BLUETOOTH_CONNECT",
+        "MANAGE_OWN_CALLS",
+        "POST_NOTIFICATIONS"
       ],
       "predictiveBackGestureEnabled": false,
       "package": "com.orbitratech.callnet"
@@ -35,6 +43,27 @@
     "plugins": [
       "expo-router",
       "expo-dev-client",
+      "expo-notifications",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          },
+          "ios": {
+            "deploymentTarget": "16.4"
+          }
+        }
+      ],
+      [
+        "expo-callkit-telecom",
+        {
+          "incomingCallTimeout": 45,
+          "outgoingCallTimeout": 60,
+          "fulfillAnswerCallTimeout": 30,
+          "microphonePermission": "Callnet needs your microphone to make calls."
+        }
+      ],
       [
         "@config-plugins/react-native-webrtc",
         {

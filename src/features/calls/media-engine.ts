@@ -80,7 +80,7 @@ function unwrapDefault<T>(value: unknown): T {
 
 function loadWebRTCModule() {
   try {
-    const rtc = unwrapDefault<WebRTCModule>(require('react-native-webrtc'));
+    const rtc = unwrapDefault<WebRTCModule>(require('@livekit/react-native-webrtc'));
 
     if (!rtc || typeof rtc.RTCPeerConnection !== 'function') {
       throw new Error('webrtc-peer-connection-unavailable');

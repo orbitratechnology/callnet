@@ -23,7 +23,7 @@ declare const require: (moduleName: string) => unknown;
 
 function getRtcView() {
   try {
-    return (require('react-native-webrtc') as RtcViewModule).RTCView;
+    return (require('@livekit/react-native-webrtc') as RtcViewModule).RTCView;
   } catch {
     return undefined;
   }
