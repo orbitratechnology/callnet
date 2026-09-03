@@ -4,5 +4,7 @@
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
   },
-  "js/ts.experimental.useTsgo": true
+  "js/ts.experimental.useTsgo": true,
+  "doppler.autocomplete.enable": true,
+  "doppler.hover.enable": true
 }

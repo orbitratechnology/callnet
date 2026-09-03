@@ -1,0 +1,3 @@
+setup:
+  - project: callnet
+    config: dev_personal

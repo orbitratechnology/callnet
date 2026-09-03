@@ -45,12 +45,12 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
+    "start": "doppler run -- expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "prebuild": "expo prebuild",
-    "web": "expo start --web",
+    "android": "doppler run -- expo run:android",
+    "ios": "doppler run -- expo run:ios",
+    "prebuild": "doppler run -- expo prebuild",
+    "web": "doppler run -- expo start --web",
     "lint": "expo lint"
   },
   "private": true
