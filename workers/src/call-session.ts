@@ -9,6 +9,7 @@ import {
   SIGNALING_PROTOCOL_VERSION,
   type ServerSignalingMessage,
 } from './protocol';
+import { dispatchOfflineCallInvitePush } from './push-dispatch';
 
 const INTERNAL_EVENT = 'user-session-event';
 const INTERNAL_DISCONNECT = 'user-session-disconnect';
@@ -253,9 +254,21 @@ export class CallSession extends DurableObject<Env> {
       await this.ctx.storage.setAlarm(timestamp + INVITE_TIMEOUT_MS);
 
       if (!(await this.deliverEvent(event))) {
-        deleteSession(this.ctx);
-        await this.ctx.storage.deleteAlarm();
-        return jsonResponse({ ok: false, code: 'peer-offline' }, 409);
+        const pushResult = await dispatchOfflineCallInvitePush(this.env, event);
+        if (!pushResult.delivered) {
+          deleteSession(this.ctx);
+          await this.ctx.storage.deleteAlarm();
+          return jsonResponse({ ok: false, code: 'peer-offline' }, 409);
+        }
+
+        console.info(JSON.stringify({
+          event: 'call_invite_push_delivered',
+          callId: event.callId,
+          targetUid: event.to,
+          attempted: pushResult.attempted,
+          succeeded: pushResult.succeeded,
+        }));
+        return jsonResponse({ ok: true, code: 'push-delivered' });
       }
 
       return jsonResponse({ ok: true });
@@ -379,4 +392,3 @@ export class CallSession extends DurableObject<Env> {
     }
   }
 }
-

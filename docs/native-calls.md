@@ -29,6 +29,8 @@ The adapter is intentionally tolerant of an old development client: it becomes a
 
 The app registers the native VoIP channel after Firebase authentication. The token is stored at `users/{uid}/devices/{deviceId}` with owner-only Firestore writes. The app does not store SDP, ICE, audio, video, or call content.
 
-The Cloudflare Worker still needs a secure push-sender path and platform credentials before background incoming calls can be enabled. iOS needs an APNs VoIP certificate/key; Android needs FCM delivery credentials. These must be added through deployment secrets, never the mobile bundle.
+The Cloudflare Worker now has a secure push-sender path in [push-dispatch.ts](../workers/src/push-dispatch.ts). It reads device-token metadata from Firestore, sends FCM HTTP v1 data messages or APNs VoIP pushes, and keeps provider credentials in Wrangler secrets. The payload contains the call ID, call type, and caller identity needed by the native call surface; it never contains SDP, ICE, audio, video, or raw call content.
+
+The required setup and remaining verification are tracked in [PHASE_6B_PUSH_DELIVERY.md](../PHASE_6B_PUSH_DELIVERY.md). iOS still needs APNs provider credentials, and Android killed-app terminal events still need the native receiver described in the package platform notes.
 
 The current config intentionally does not register an Android killed-app broadcast receiver. The package documents that a native receiver is required to notify the backend when a system decline occurs while JavaScript is not running; that receiver is a later bounded native task.

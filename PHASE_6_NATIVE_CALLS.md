@@ -15,8 +15,10 @@ Status: implemented in source; native rebuild and device verification are pendin
 ## Not yet passed
 
 - [ ] Install dependencies and rebuild the development client on Android and iOS.
-- [ ] Configure a production push sender for FCM and APNs VoIP pushes.
+- [x] Added the Cloudflare push-dispatch boundary for Firestore device-token lookup, FCM data messages, and APNs VoIP messages.
 - [ ] Add the Android killed-app event receiver before relying on JS to report a system decline while the app is killed.
+- [x] Added the Firebase service-account secrets to the deployed Worker through Wrangler.
+- [ ] Add APNs provider secrets before enabling iOS background calls.
 - [ ] Run the two-device native incoming-call acceptance gate.
 
-The push sender and device gate remain separate follow-up work. This phase does not claim background, locked-device, or killed-app behavior as verified.
+The push sender is now implemented, but credentials, deployment, native rebuild, and the device gate remain follow-up work. This phase does not claim background, locked-device, or killed-app behavior as verified.

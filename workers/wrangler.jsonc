@@ -10,7 +10,14 @@
     "head_sampling_rate": 0.1
   },
   "vars": {
-    "FIREBASE_PROJECT_ID": "callnet-orbitra-20260902"
+    "FIREBASE_PROJECT_ID": "callnet-orbitra-20260902",
+    "APNS_BUNDLE_ID": "com.orbitratech.callnet"
+  },
+  "secrets": {
+    "required": [
+      "FIREBASE_SERVICE_ACCOUNT_EMAIL",
+      "FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY"
+    ]
   },
   "durable_objects": {
     "bindings": [
