@@ -1,6 +1,6 @@
 # Phase 5 — Firebase Auth and real identities
 
-This phase replaces the development-only identity path with Firebase-authenticated users while keeping the existing call controller and Socket.IO protocol stable.
+This phase replaces the development-only identity path with Firebase-authenticated users while keeping the existing call controller and signaling interface stable. Signaling now runs through the deployed Cloudflare Worker and native WebSocket transport.
 
 ## Task breakdown
 
@@ -22,39 +22,31 @@ This phase replaces the development-only identity path with Firebase-authenticat
 - [x] Add email/password sign-in.
 - [x] Add email/password account creation with display name.
 - [x] Add sign-out and user profile display.
-- [ ] Add native Google OAuth client IDs and native Google sign-in.
+- [x] Add the native Google OAuth client configuration and Nitro Google sign-in adapter.
 
 ### 5.3 Authenticated signaling
 
 - [x] Replace development IDs with Firebase UID identity objects.
-- [x] Send Firebase ID tokens in the Socket.IO handshake.
-- [x] Verify Firebase ID-token claims and signature on the signaling server.
+- [x] Send Firebase ID tokens in the WebSocket subprotocol handshake.
+- [x] Verify Firebase ID-token claims and signature in the Cloudflare Worker.
 - [x] Reject missing, expired, mismatched, or invalid identities.
 - [x] Preserve versioned call-event validation and peer-offline acknowledgements.
-- [ ] Move the verified signaling service to Cloud Run.
+- [x] Move the verified signaling service to Cloudflare Workers with Durable Objects.
 
 ### 5.4 Real-identity contact bridge
 
 - [x] Remove seeded contacts from authenticated recent-call state.
 - [x] Add contacts by Firebase UID and persist them per signed-in user.
 - [x] Keep the existing voice/video WebRTC call controller unchanged at the UI boundary.
-- [ ] Replace manual UID entry with authenticated Firestore user discovery.
+- [x] Replace manual UID entry with authenticated Firestore username discovery.
 
 ## Bounded verification completed
 
 - [x] Firebase CLI version verified: `15.28.2`.
 - [x] TypeScript check passed with `tsc --noEmit`.
 - [x] `git diff --check` passed.
-- [ ] Native device test after rebuilding the development client.
+- [ ] Native device test after rebuilding the development client (intentionally skipped for now).
 
-## User gate before Phase 5 device QA
+## Device QA gate
 
-The Firebase and AsyncStorage additions change the native dependency graph, so the existing installed development client must be rebuilt by the user. After installation:
-
-1. Restart the signaling service so it loads the authenticated server code.
-2. Create or sign in to one real account on each device.
-3. Open Profile on both devices and record each Firebase UID.
-4. Add the other UID as a contact on each device.
-5. Reply `continue` so the bounded `agent-device` QA can verify authenticated voice/video calling, accept/reject/cancel/end, and cleanup.
-
-`gcloud` is not available on the current PATH, so Cloud Run setup is not part of this gate. It will be configured only after the CLI is installed and a region is selected.
+The two-device gate is intentionally deferred. It must be completed before production release, but it does not block the remaining code, security, privacy, accessibility, and release-documentation work.

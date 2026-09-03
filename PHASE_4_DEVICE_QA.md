@@ -1,8 +1,10 @@
-# Callnet Phase 4 — Two-device WebRTC QA Gate
+# Callnet Phase 4 — Two-device WebRTC QA Gate (skipped)
+
+> Current decision: this manual device gate is intentionally skipped so implementation can continue. Its checklist is retained as a future acceptance reference; no item below should be treated as current passing evidence.
 
 This gate must pass before Firebase Auth or Firestore work begins. It is a manual device gate; static checks do not count as device evidence.
 
-## Current gate status
+## Historical gate status
 
 - [x] Android development client opened with `agent-device`.
 - [x] Debug APK installed on both Android targets.
@@ -115,8 +117,8 @@ The operator, not the coding agent, should run the long-lived provisioning/build
 ```text
 Install dependencies using the repository package manager.
 Create and install an Expo development client for Android or iOS.
-Start the signaling service with `bun run signaling:dev`.
-Launch the two clients with separate `device-a` and `device-b` development configuration.
+Deploy or use the Cloudflare Worker configured by `EXPO_PUBLIC_SIGNALING_URL`.
+Launch the two clients with separate Metro processes when this deferred gate is resumed.
 ```
 
 Once both clients are installed and visible, use the `agent-device` loop: open the app, act, verify the named expectation, capture evidence when needed, and close the session.

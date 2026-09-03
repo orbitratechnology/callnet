@@ -1,20 +1,19 @@
 # Callnet
 
-Callnet is an Expo SDK 57 one-to-one voice and video calling app. The app uses Firebase email/password or Google authentication and Firebase UID-based Socket.IO signaling. Native WebRTC runs in an Expo development build, not Expo Go.
+Callnet is an Expo SDK 57 one-to-one voice and video calling app. The app uses Firebase email/password or Google authentication and authenticated WebSocket signaling through Cloudflare Durable Objects. Native WebRTC runs in an Expo development build, not Expo Go.
 
 ## Local setup
 
 1. Copy `.env.example` to `.env.local` and fill in the Firebase web configuration and local TURN values. `.env.local` is ignored by Git.
 2. Install dependencies with the repository package manager.
 3. Have the user build/install a fresh Expo development client after native dependency changes.
-4. Start Metro and the signaling service separately:
+4. Start Metro for the app:
 
    ```bash
    npx expo start
-   bun run signaling:dev
    ```
 
-For physical devices, `EXPO_PUBLIC_SIGNALING_URL` must resolve to the signaling host. With an ADB reverse tunnel it can be `http://127.0.0.1:8787`; on the LAN it should use the host's LAN address. The server verifies Firebase ID tokens for `FIREBASE_PROJECT_ID` before relaying any call event.
+The normal calling flow uses the deployed Worker configured in `EXPO_PUBLIC_SIGNALING_URL`. Deploy and operate it from [workers/](workers/), using Wrangler. The former Node/Socket.IO service has been removed.
 
 ## Authenticated calling flow
 
