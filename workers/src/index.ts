@@ -2,6 +2,7 @@ import { CallSession } from './call-session';
 import { verifyFirebaseIdToken } from './firebase-token';
 import { getFirebaseTokenFromSubprotocolHeader, SIGNALING_SUBPROTOCOL } from './protocol';
 import { UserSession } from './user-session';
+import { fetchMeteredIceServers } from './turn-credentials';
 
 export { CallSession, UserSession };
 
@@ -10,6 +11,35 @@ export default {
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
       return Response.json({ service: 'callnet-signaling', status: 'ok' });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/ice-servers') {
+      const authorization = request.headers.get('Authorization');
+      const token = authorization?.startsWith('Bearer ')
+        ? authorization.slice('Bearer '.length).trim()
+        : '';
+      if (!token) {
+        return new Response('Unauthorized.', { status: 401, headers: { 'Cache-Control': 'no-store' } });
+      }
+
+      try {
+        await verifyFirebaseIdToken(token, env.FIREBASE_PROJECT_ID);
+        const iceServers = await fetchMeteredIceServers(env);
+        return Response.json(iceServers, {
+          headers: { 'Cache-Control': 'no-store' },
+        });
+      } catch (error) {
+        console.warn(
+          JSON.stringify({
+            event: 'ice_servers_request_failed',
+            reason: error instanceof Error ? error.message : 'unknown',
+          }),
+        );
+        return new Response('Unable to provide ICE servers.', {
+          status: 503,
+          headers: { 'Cache-Control': 'no-store' },
+        });
+      }
     }
 
     if (url.pathname !== '/ws') {

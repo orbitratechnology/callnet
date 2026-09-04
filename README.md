@@ -4,16 +4,23 @@ Callnet is an Expo SDK 57 one-to-one voice and video calling app. The app uses F
 
 ## Local setup
 
-1. Copy `.env.example` to `.env.local` and fill in the Firebase web configuration and local TURN values. `.env.local` is ignored by Git.
-2. Install dependencies with the repository package manager.
-3. Have the user build/install a fresh Expo development client after native dependency changes.
-4. Start Metro for the app:
+1. Install and authenticate the Doppler CLI, then configure this repository for `callnet/dev_personal`:
 
    ```bash
-   npx expo start
+   doppler login
+   doppler setup --project callnet --config dev_personal --no-interactive
    ```
 
-The normal calling flow uses the deployed Worker configured in `EXPO_PUBLIC_SIGNALING_URL`. Deploy and operate it from [workers/](workers/), using Wrangler. The former Node/Socket.IO service has been removed.
+2. Keep public Expo/Firebase client configuration in Doppler `dev_personal`; do not create a plaintext `.env.local` file.
+3. Install dependencies with the repository package manager.
+4. Have the user build/install a fresh Expo development client after native dependency changes.
+5. Start Metro for the app:
+
+   ```bash
+   bun run start
+   ```
+
+The normal calling flow uses the deployed Worker configured in `EXPO_PUBLIC_SIGNALING_URL`. Deploy and operate it from [workers/](workers/), using Wrangler. The former Node/Socket.IO service has been removed. TURN credentials are requested from the authenticated Worker at `/ice-servers`; the mobile app must not contain Metered API keys or long-lived TURN credentials.
 
 Native incoming-call UI is provided by `expo-callkit-telecom` on iOS CallKit and Android Core-Telecom. It requires a development-client rebuild after dependency or config changes; see [docs/native-calls.md](docs/native-calls.md).
 
@@ -23,7 +30,20 @@ Create or sign in to a real Firebase email/password or Google account on each de
 
 Native Google sign-in uses the registered Firebase Android/iOS apps and the web OAuth client ID. The first native run requires a fresh development build after the Google Sign-In package/config plugin is added.
 
-Keep TURN credentials and Firebase admin credentials out of source control. Firebase client configuration is public client configuration; the signaling server must use Firebase ID-token verification and must never receive a service-account key in the mobile app.
+Keep TURN credentials, Metered API keys, Firebase admin credentials, and private APNs keys in Doppler/Cloudflare secrets—not in source control. Firebase client configuration is public client configuration; the signaling server must use Firebase ID-token verification and must never receive a service-account key in the mobile app.
+
+## Secret management
+
+- Doppler `dev_personal` stores local Expo public configuration.
+- Doppler `prd` stores the Worker’s Firebase service-account credentials and non-secret Worker settings.
+- Cloudflare Worker secrets contain only server-side runtime credentials.
+- `METERED_TURN_API_KEY` must be entered directly into Doppler and synchronized to Cloudflare before deploying the Worker:
+
+  ```bash
+  doppler secrets set METERED_TURN_API_KEY --project callnet --config prd
+  ```
+
+  Enter the value interactively; never place it in a command, `.env` file, or mobile `EXPO_PUBLIC_*` variable.
 
 ## Get a fresh project
 

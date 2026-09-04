@@ -8,33 +8,55 @@ export function getSignalingUrl() {
   return process.env.EXPO_PUBLIC_SIGNALING_URL ?? 'wss://callnet-signaling.orbitra-technology.workers.dev';
 }
 
-export function getIceServers() {
-  const configuredUrls = (process.env.EXPO_PUBLIC_TURN_URLS ?? '')
-    .split(',')
-    .map((url) => url.trim())
-    .filter(Boolean);
-  const turnUrl = process.env.EXPO_PUBLIC_TURN_URL;
-  const turnUsername = process.env.EXPO_PUBLIC_TURN_USERNAME;
-  const turnCredential = process.env.EXPO_PUBLIC_TURN_CREDENTIAL;
-  const urls = configuredUrls.length > 0 ? configuredUrls : turnUrl ? [turnUrl] : [];
-  const servers: Array<{ urls: string | string[]; username?: string; credential?: string }> = [];
-  const turnUrls = urls.filter((url) => url.startsWith('turn:') || url.startsWith('turns:'));
+export type IceServerConfig = {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+};
 
-  urls
-    .filter((url) => url.startsWith('stun:'))
-    .forEach((url) => servers.push({ urls: url }));
+const fallbackIceServers: IceServerConfig[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
-  if (turnUrls.length > 0 && turnUsername && turnCredential) {
-    servers.push({
-      urls: turnUrls.length === 1 ? turnUrls[0] : turnUrls,
-      username: turnUsername,
-      credential: turnCredential,
+function getSignalingHttpUrl() {
+  const signalingUrl = getSignalingUrl();
+  return signalingUrl.replace(/^ws(s?):\/\//, 'http$1://').replace(/\/ws\/?$/, '');
+}
+
+function isIceServer(value: unknown): value is IceServerConfig {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const urls = candidate.urls;
+  const validUrls = typeof urls === 'string'
+    ? urls.startsWith('stun:') || urls.startsWith('turn:') || urls.startsWith('turns:')
+    : Array.isArray(urls) && urls.length > 0 && urls.every((url) => typeof url === 'string' && (url.startsWith('stun:') || url.startsWith('turn:') || url.startsWith('turns:')));
+
+  return validUrls &&
+    (candidate.username === undefined || typeof candidate.username === 'string') &&
+    (candidate.credential === undefined || typeof candidate.credential === 'string');
+}
+
+export async function getIceServers(idToken: string): Promise<IceServerConfig[]> {
+  try {
+    const response = await fetch(`${getSignalingHttpUrl()}/ice-servers`, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
     });
-  }
 
-  if (servers.length === 0) {
-    servers.push({ urls: 'stun:stun.l.google.com:19302' });
-  }
+    if (!response.ok) {
+      throw new Error(`turn-credentials-http-${response.status}`);
+    }
 
-  return servers;
+    const servers = (await response.json()) as unknown;
+    if (!Array.isArray(servers) || servers.length === 0 || !servers.every(isIceServer)) {
+      throw new Error('turn-credentials-invalid');
+    }
+
+    return servers;
+  } catch {
+    return fallbackIceServers;
+  }
 }

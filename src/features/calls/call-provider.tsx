@@ -132,7 +132,7 @@ export function CallProvider({
           photoURL: profile.photoURL,
         },
         signalingUrl: getSignalingUrl(),
-        iceServers: getIceServers(),
+          iceServers: await getIceServers(idToken),
       });
     }
     return realControllerRef.current;
