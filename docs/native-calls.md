@@ -31,6 +31,6 @@ The app registers the native VoIP channel after Firebase authentication. The tok
 
 The Cloudflare Worker now has a secure push-sender path in [push-dispatch.ts](../workers/src/push-dispatch.ts). It reads device-token metadata from Firestore, sends FCM HTTP v1 data messages or APNs VoIP pushes, and keeps provider credentials in Wrangler secrets. The payload contains the call ID, call type, and caller identity needed by the native call surface; it never contains SDP, ICE, audio, video, or raw call content.
 
-The required setup and remaining verification are tracked in [PHASE_6B_PUSH_DELIVERY.md](../PHASE_6B_PUSH_DELIVERY.md). iOS still needs APNs provider credentials, and Android killed-app terminal events still need the native receiver described in the package platform notes.
+The required setup and remaining verification are tracked in [PHASE_6B_PUSH_DELIVERY.md](../PHASE_6B_PUSH_DELIVERY.md). iOS still needs APNs provider credentials, while Android has the native killed-app event receiver configured in `app.json`.
 
-The current config intentionally does not register an Android killed-app broadcast receiver. The package documents that a native receiver is required to notify the backend when a system decline occurs while JavaScript is not running; that receiver is a later bounded native task.
+The Android receiver records only bounded terminal-call metadata locally. It does not send an unauthenticated request while JavaScript is unavailable; the event is flushed as an authenticated reject after Firebase Auth restores and the WebSocket reconnects.

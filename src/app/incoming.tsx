@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { useCall } from '@/features/calls/call-provider';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { strings } from '@/localization/strings';
 
 export default function IncomingCallScreen() {
   const { session, acceptIncoming, reject } = useCall();
@@ -30,14 +31,14 @@ export default function IncomingCallScreen() {
   if (!isIncoming || !session) {
     return (
       <View style={styles.container}>
-        <Stack.Screen options={{ title: 'Incoming Call', headerShown: false }} />
+        <Stack.Screen options={{ title: strings.incoming.screenTitle, headerShown: false }} />
         <View style={styles.identity}>
-          <ThemedText variant="title" style={styles.centered}>No incoming call</ThemedText>
+          <ThemedText variant="title" style={styles.centered}>{strings.incoming.unavailableTitle}</ThemedText>
           <ThemedText variant="body" tone="secondary" style={styles.centered}>
-            This call is no longer available.
+            {strings.incoming.unavailableCopy}
           </ThemedText>
         </View>
-        <Button title="Back" variant="ghost" onPress={() => router.back()} />
+        <Button title={strings.call.back} variant="ghost" onPress={() => router.back()} />
       </View>
     );
   }
@@ -65,9 +66,9 @@ export default function IncomingCallScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: 'Incoming Call', headerShown: false }} />
+      <Stack.Screen options={{ title: strings.incoming.screenTitle, headerShown: false }} />
       <View style={styles.topBar}>
-        <ThemedText variant="caption" tone="secondary">INCOMING {callType.toUpperCase()} CALL</ThemedText>
+        <ThemedText variant="caption" tone="secondary">{strings.incoming.label(callType)}</ThemedText>
       </View>
 
       <View style={styles.identity}>
@@ -77,13 +78,13 @@ export default function IncomingCallScreen() {
           {session.person.handle}
         </ThemedText>
         <ThemedText variant="headline" tone="brand" style={styles.centered}>
-          Calling you now
+          {strings.incoming.callingNow}
         </ThemedText>
       </View>
 
       <View style={styles.actions}>
-        <Button title={`Answer ${callType.toLowerCase()} call`} loading={isAnswering} onPress={() => void answer()} />
-        <Button title="Decline" variant="destructive" disabled={isAnswering} onPress={decline} />
+        <Button title={strings.incoming.answer(callType)} loading={isAnswering} onPress={() => void answer()} />
+        <Button title={strings.incoming.decline} variant="destructive" disabled={isAnswering} onPress={decline} />
       </View>
     </View>
   );

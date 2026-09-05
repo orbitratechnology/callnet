@@ -43,5 +43,7 @@ example
 # generated native folders
 /ios
 /android
+modules/**/android/build/
+modules/**/android/.gradle/
 google-services.json
 GoogleService-Info.plist

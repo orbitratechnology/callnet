@@ -18,7 +18,7 @@ import {
   type MediaStreamLike,
   type SessionDescription,
 } from './media-engine';
-import type { SignalingTransport } from './signaling-transport';
+import type { SignalingTransport, SignalingTransportStatus } from './signaling-transport';
 import { WebSocketSignalingTransport } from './websocket-signaling';
 import { nativeCallUi, type NativeCallUi, type NativeCallUiEvent } from './native-call-ui';
 import {
@@ -31,6 +31,7 @@ export type RealCallControllerEvent =
   | { type: 'incoming'; callId: string; kind: CallKind; from: CallIdentityId; profile: CallProfile; timestamp: number }
   | { type: 'state'; callId: string; state: 'connecting' | 'connected' | 'ended' | 'failed'; failureReason?: string }
   | { type: 'controls'; callId: string; muted?: boolean; cameraEnabled?: boolean }
+  | { type: 'transport'; status: SignalingTransportStatus }
   | { type: 'streams'; localStreamUrl: string | null; remoteStreamUrl: string | null };
 
 export type WebRTCCallControllerOptions = {
@@ -75,6 +76,7 @@ export class WebRTCCallController {
   private remoteStreamUrl: string | null = null;
   private isConnected = false;
   private unsubscribeFromTransport: (() => void) | null = null;
+  private unsubscribeFromTransportStatus: (() => void) | null = null;
   private unsubscribeFromNativeCallUi: (() => void) | null = null;
   private readonly finishingCallIds = new Set<string>();
   private disconnectPromise: Promise<void> | null = null;
@@ -105,6 +107,9 @@ export class WebRTCCallController {
       void this.handleNativeCallUiEvent(event).catch(() => undefined);
     });
     this.unsubscribeFromTransport = this.transport.subscribe((event) => void this.handleEvent(event));
+    this.unsubscribeFromTransportStatus = this.transport.subscribeStatus?.((status) => {
+      this.handleTransportStatus(status);
+    }) ?? null;
     await this.transport.connect({ identity: this.identity, idToken: this.authToken });
     this.isConnected = true;
     await this.flushPendingCallEvents();
@@ -300,6 +305,8 @@ export class WebRTCCallController {
     this.unsubscribeFromNativeCallUi = null;
     this.unsubscribeFromTransport?.();
     this.unsubscribeFromTransport = null;
+    this.unsubscribeFromTransportStatus?.();
+    this.unsubscribeFromTransportStatus = null;
     this.isConnected = false;
 
     const call = this.activeCall;
@@ -377,6 +384,20 @@ export class WebRTCCallController {
         this.pendingIceCandidates.push(this.getIceCandidate(event));
       }
     }
+  }
+
+  private handleTransportStatus(status: SignalingTransportStatus) {
+    this.emit({ type: 'transport', status });
+    if (status !== 'offline') {
+      return;
+    }
+
+    const call = this.activeCall;
+    if (!call || this.finishingCallIds.has(call.callId)) {
+      return;
+    }
+
+    void this.failActiveCall(call.callId, 'signaling-reconnect-exhausted').catch(() => undefined);
   }
 
   private async handleInvite(event: CallEvent) {
@@ -556,6 +577,9 @@ export class WebRTCCallController {
 
   private async failActiveCall(callId: string, failureReason: string) {
     const call = this.activeCall;
+    if (!call || call.callId !== callId) {
+      return;
+    }
     if (call?.nativeAnswerRequestId) {
       await this.nativeCallUi.failIncoming(callId, call.nativeAnswerRequestId).catch(() => undefined);
     } else {

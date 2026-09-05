@@ -40,6 +40,19 @@ export const BrandColors = {
   dark: { accent: '#61C8B6', accentSoft: '#173F39', accentContrast: '#E8FFFA' },
 } as const;
 
+export const CallColors = {
+  background: '#07100E',
+  surface: 'rgba(17, 31, 28, 0.86)',
+  surfaceStrong: 'rgba(23, 42, 38, 0.96)',
+  border: 'rgba(232, 255, 250, 0.18)',
+  onSurface: '#F3FFFA',
+  onSurfaceSecondary: '#B9C8C3',
+  onSurfaceMuted: '#83938E',
+  controlBackground: '#F3FFFA',
+  controlForeground: '#10211E',
+  endCall: '#E5544F',
+} as const;
+
 export function useBrandColors() {
   const scheme = useColorScheme();
   return BrandColors[scheme === 'dark' ? 'dark' : 'light'];
@@ -71,6 +84,12 @@ export const Motion = {
   fast: 150,
   base: 250,
   slow: 400,
+} as const;
+
+export const Shadows = {
+  card: '0 1px 2px rgba(15, 64, 58, 0.08)',
+  raised: '0 6px 18px rgba(15, 64, 58, 0.16)',
+  floating: '0 8px 24px rgba(15, 64, 58, 0.22)',
 } as const;
 
 export const Type = {

@@ -1,73 +1,95 @@
 import { router, Stack } from 'expo-router';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
+import { memo, useCallback } from 'react';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PersonRow } from '@/components/person-row';
+import { Avatar } from '@/components/avatar';
+import { CallLogRow } from '@/components/call-log-row';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { IconButton } from '@/components/ui/icon-button';
-import { demoPeople } from '@/features/contacts/demo-people';
+import { demoPeople, getInitials } from '@/features/contacts/demo-people';
+import { useAuth } from '@/features/auth/auth-provider';
 import { useCall } from '@/features/calls/call-provider';
 import type { RecentCall } from '@/features/recents/recent-call-repository';
-import { Colors, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { Colors, MaxContentWidth, Radius, Shadows, Spacing, useBrandColors } from '@/constants/theme';
+import { strings } from '@/localization/strings';
+import { redactDiagnostic } from '../../shared/diagnostics';
 
-function getRecentCallDetail(call: RecentCall) {
-  const kind = call.kind === 'video' ? 'Video' : 'Voice';
-  const direction = call.direction === 'incoming' ? 'Incoming' : 'Outgoing';
-  const outcome =
-    call.outcome === 'completed'
-      ? 'Completed'
-      : call.outcome === 'timed-out'
-        ? 'Timed out'
-        : call.outcome === 'rejected'
-          ? 'Declined'
-          : call.outcome.charAt(0).toUpperCase() + call.outcome.slice(1);
-  const title = call.outcome === 'missed' ? `Missed · ${kind}` : `${direction} · ${kind}`;
-
-  return `${title}\n${formatRecentCallTimestamp(call.timestamp)} · ${outcome}`;
+function formatTime(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
-function formatRecentCallTimestamp(timestamp: number) {
+function getDateKey(timestamp: number) {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function formatDateLabel(timestamp: number) {
   const date = new Date(timestamp);
   const now = new Date();
-  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  const isToday =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-
-  if (isToday) {
-    return `Today, ${time}`;
-  }
+  if (getDateKey(timestamp) === getDateKey(now.getTime())) return strings.home.dateToday;
 
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  const isYesterday =
-    date.getFullYear() === yesterday.getFullYear() &&
-    date.getMonth() === yesterday.getMonth() &&
-    date.getDate() === yesterday.getDate();
+  if (getDateKey(timestamp) === getDateKey(yesterday.getTime())) return strings.home.dateYesterday;
 
-  if (isYesterday) {
-    return `Yesterday, ${time}`;
-  }
-
-  return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function HomeHeader({ onStartCall, onProfile }: { onStartCall: () => void; onProfile: () => void }) {
+function HeaderProfileButton({
+  displayName,
+  photoURL,
+  onPress,
+}: {
+  displayName: string;
+  photoURL?: string | null;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={strings.home.profile}
+      onPress={onPress}
+      style={({ pressed }) => [styles.headerAvatarButton, { opacity: pressed ? 0.68 : 1 }]}
+    >
+      <Avatar initials={getInitials(displayName)} photoURL={photoURL} size="sm" accessible={false} />
+    </Pressable>
+  );
+}
+
+const RecentCallItem = memo(function RecentCallItem({
+  call,
+  previousTimestamp,
+  onPress,
+}: {
+  call: RecentCall;
+  previousTimestamp?: number;
+  onPress: () => void;
+}) {
+  const showDate = previousTimestamp === undefined || getDateKey(previousTimestamp) !== getDateKey(call.timestamp);
+  return (
+    <CallLogRow
+      call={call}
+      dateLabel={showDate ? formatDateLabel(call.timestamp) : undefined}
+      timeLabel={formatTime(call.timestamp)}
+      onPress={onPress}
+    />
+  );
+});
+
+function HomeHeader() {
   return (
     <View style={styles.headerContent}>
       <View style={styles.intro}>
-        <ThemedText variant="title">Private calls, made simple.</ThemedText>
+        <ThemedText variant="title">{strings.home.introTitle}</ThemedText>
         <ThemedText variant="body" tone="secondary" selectable>
-          Find someone you know and connect in a single focused flow.
+          {strings.home.introCopy}
         </ThemedText>
       </View>
-
-      <Button title="Start a call" size="lg" onPress={onStartCall} />
-
       <View style={styles.sectionHeader}>
-        <ThemedText variant="headline">Recent</ThemedText>
-        <IconButton label="Profile" onPress={onProfile} />
+        <ThemedText variant="headline">{strings.home.recent}</ThemedText>
+        <View style={styles.sectionRule} />
       </View>
     </View>
   );
@@ -76,18 +98,18 @@ function HomeHeader({ onStartCall, onProfile }: { onStartCall: () => void; onPro
 function HomeFooter({ onIncomingCall }: { onIncomingCall: () => void }) {
   return (
     <View style={styles.footerContent}>
-      <View style={styles.privacyNote}>
-        <ThemedText variant="caption" tone="brand">PRIVATE BY DESIGN</ThemedText>
-        <ThemedText variant="subhead" tone="secondary" selectable>
-          A calm, focused calling space with privacy details kept clear and factual.
-        </ThemedText>
+      <View style={styles.footerRule} />
+      <View style={styles.footerRow}>
+        <View style={styles.statusDot} />
+        <View style={styles.footerCopy}>
+          <ThemedText variant="caption" tone="brand">{strings.home.privateByDesign}</ThemedText>
+          <ThemedText variant="subhead" tone="secondary" selectable>{strings.home.privacyCopy}</ThemedText>
+        </View>
       </View>
       <View style={styles.demoNote}>
-        <ThemedText variant="caption" tone="secondary">LOCAL DEMO MODE</ThemedText>
-        <ThemedText variant="subhead" tone="secondary">
-          Try an incoming call to exercise the accept, reject, and end flow.
-        </ThemedText>
-        <Button title="Try incoming call" variant="secondary" size="sm" onPress={onIncomingCall} />
+        <ThemedText variant="caption" tone="secondary">{strings.home.demoMode}</ThemedText>
+        <ThemedText variant="subhead" tone="secondary">{strings.home.demoCopy}</ThemedText>
+        <Button title={strings.home.tryIncoming} variant="secondary" size="sm" onPress={onIncomingCall} />
       </View>
     </View>
   );
@@ -102,107 +124,189 @@ function WebRTCFooter({
   status: 'connecting' | 'connected' | 'offline';
   onRetry: () => void;
 }) {
-  const statusLabel = status === 'connected' ? 'CONNECTED' : status === 'connecting' ? 'CONNECTING…' : 'OFFLINE';
-  const statusCopy = status === 'connected'
-    ? 'Calls use your Firebase identity and a secure WebSocket signaling connection.'
+  const statusLabel = status === 'connected'
+    ? strings.home.statuses.connected
     : status === 'connecting'
-      ? 'Connecting to the calling service. You can retry if this takes too long.'
-      : 'The calling service is unavailable. Check your connection and try again.';
+      ? strings.home.statuses.connecting
+      : strings.home.statuses.offline;
+  const diagnostic = error ? redactDiagnostic(error) : null;
+  const statusCopy = strings.home.statusCopy[status];
 
   return (
     <View style={styles.footerContent}>
-      <View style={styles.privacyNote}>
-        <ThemedText variant="caption" tone={status === 'connected' ? 'brand' : 'secondary'}>
-          AUTHENTICATED WEBRTC · {statusLabel}
-        </ThemedText>
-        <ThemedText variant="subhead" tone="secondary" selectable>{statusCopy}</ThemedText>
-        {__DEV__ && error ? <ThemedText variant="caption" tone="secondary" selectable>Diagnostic: {error}</ThemedText> : null}
-        {status !== 'connected' ? (
-          <Button
-            title="Retry connection"
-            variant="secondary"
-            size="sm"
-            loading={status === 'connecting'}
-            disabled={status === 'connecting'}
-            onPress={onRetry}
-          />
-        ) : null}
+      <View style={styles.footerRule} />
+      <View style={styles.footerRow}>
+        <View style={[styles.statusDot, status === 'connected' ? styles.statusDotOnline : styles.statusDotOffline]} />
+        <View style={styles.footerCopy}>
+          <ThemedText variant="caption" tone={status === 'connected' ? 'brand' : 'secondary'}>
+            {strings.home.authenticated} · {statusLabel}
+          </ThemedText>
+          <ThemedText variant="subhead" tone="secondary" selectable>{statusCopy}</ThemedText>
+          {__DEV__ && diagnostic ? (
+            <ThemedText variant="caption" tone="secondary" selectable>{strings.home.diagnostic(diagnostic)}</ThemedText>
+          ) : null}
+        </View>
       </View>
+      {status !== 'connected' ? (
+        <Button
+          title={strings.home.retry}
+          variant="secondary"
+          size="sm"
+          loading={status === 'connecting'}
+          disabled={status === 'connecting'}
+          onPress={onRetry}
+        />
+      ) : null}
     </View>
   );
 }
 
-export default function HomeScreen() {
-  const { recentCalls, simulateIncoming, transportMode, transportStatus, transportError, retryConnection } = useCall();
-
-  const startDemoIncomingCall = () => {
-    simulateIncoming(demoPeople[0], 'voice');
-    router.push('/incoming');
-  };
+function StartCallFab({ onPress }: { onPress: () => void }) {
+  const brand = useBrandColors();
+  const icon: { ios: SFSymbol; android: AndroidSymbol } = { ios: 'phone.badge.plus', android: 'add' };
 
   return (
-    <>
-      <Stack.Screen options={{ title: 'Callnet', headerLargeTitle: true }} />
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={strings.home.startCall}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.fab,
+        { backgroundColor: brand.accent, opacity: pressed ? 0.8 : 1 },
+      ]}
+    >
+      <SymbolView
+        name={{ ios: icon.ios, android: icon.android, web: icon.android }}
+        size={24}
+        tintColor={Colors.onBrand}
+        fallback={<ThemedText variant="title" style={styles.fabFallback}>+</ThemedText>}
+      />
+    </Pressable>
+  );
+}
+
+export default function HomeScreen() {
+  const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { recentCalls, simulateIncoming, transportMode, transportStatus, transportError, retryConnection } = useCall();
+
+  const startDemoIncomingCall = useCallback(() => {
+    simulateIncoming(demoPeople[0], 'voice');
+    router.push('/incoming');
+  }, [simulateIncoming]);
+
+  const openProfile = useCallback(() => router.push('/profile'), []);
+  const openCall = useCallback((personId: string) => {
+    router.push({ pathname: '/call', params: { personId } });
+  }, []);
+  const renderRecentCall = useCallback(
+    ({ item, index }: { item: RecentCall; index: number }) => (
+      <RecentCallItem
+        call={item}
+        previousTimestamp={recentCalls[index - 1]?.timestamp}
+        onPress={() => openCall(item.person.id)}
+      />
+    ),
+    [openCall, recentCalls],
+  );
+
+  const profileName = user?.displayName ?? user?.email ?? 'User';
+
+  return (
+    <View style={styles.screen}>
+      <Stack.Screen
+        options={{
+          title: strings.home.screenTitle,
+          headerLargeTitle: true,
+          headerRight: () => (
+            <HeaderProfileButton displayName={profileName} photoURL={user?.photoURL} onPress={openProfile} />
+          ),
+        }}
+      />
       <FlatList
         data={recentCalls}
         keyExtractor={(call) => call.id}
+        renderItem={renderRecentCall}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
-        ItemSeparatorComponent={RecentSeparator}
-        ListHeaderComponent={
-          <HomeHeader
-            onStartCall={() => router.push('/select-person')}
-            onProfile={() => router.push('/profile')}
-          />
-        }
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 120 }]}
+        ListHeaderComponent={<HomeHeader />}
         ListEmptyComponent={
-          <ThemedText variant="body" tone="secondary" style={styles.emptyText}>
-            Your recent calls will appear here.
-          </ThemedText>
+          <View style={styles.emptyState}>
+            <ThemedText variant="headline">{strings.home.empty}</ThemedText>
+            <ThemedText variant="subhead" tone="secondary">{strings.home.emptyHint}</ThemedText>
+          </View>
         }
-        renderItem={({ item }) => (
-          <PersonRow
-            name={item.person.name}
-            initials={item.person.initials}
-            photoURL={item.person.photoURL}
-            detail={getRecentCallDetail(item)}
-            onPress={() => router.push({ pathname: '/call', params: { personId: item.person.id } })}
-          />
-        )}
         ListFooterComponent={
           transportMode === 'demo'
             ? <HomeFooter onIncomingCall={startDemoIncomingCall} />
             : <WebRTCFooter error={transportError} status={transportStatus} onRetry={() => void retryConnection()} />
         }
       />
-    </>
+      <StartCallFab onPress={() => router.push('/select-person')} />
+    </View>
   );
 }
 
-function RecentSeparator() {
-  return <View style={styles.separator} />;
-}
-
 const styles = StyleSheet.create({
-  content: { flexGrow: 1, padding: Spacing.lg, paddingBottom: Spacing.xxl },
-  headerContent: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', gap: Spacing.xl },
-  intro: { gap: Spacing.sm, paddingTop: Spacing.md },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  separator: { height: Spacing.sm },
-  emptyText: { paddingVertical: Spacing.md },
-  footerContent: { gap: Spacing.md, paddingTop: Spacing.xl },
-  privacyNote: {
-    gap: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.secondaryBackground,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.separator,
+  screen: { flex: 1, backgroundColor: Colors.systemBackground },
+  listContent: { flexGrow: 1, paddingTop: Spacing.sm },
+  headerContent: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    gap: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
   },
+  intro: { gap: Spacing.sm, paddingTop: Spacing.md },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  sectionRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: Colors.separator },
+  headerAvatarButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.full,
+  },
+  emptyState: {
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.xl,
+  },
+  footerContent: {
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+  },
+  footerRule: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.separator },
+  footerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  statusDot: {
+    width: 8,
+    height: 8,
+    marginTop: 5,
+    borderRadius: Radius.full,
+    backgroundColor: '#D9A441',
+  },
+  statusDotOnline: { backgroundColor: '#46A982' },
+  statusDotOffline: { backgroundColor: Colors.destructive },
+  footerCopy: { flex: 1, gap: Spacing.xs },
   demoNote: {
     gap: Spacing.sm,
     padding: Spacing.md,
     borderRadius: Radius.md,
     backgroundColor: Colors.secondaryBackground,
+    boxShadow: Shadows.card,
   },
+  fab: {
+    position: 'absolute',
+    right: Spacing.lg,
+    bottom: Spacing.lg,
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.full,
+    boxShadow: Shadows.floating,
+  },
+  fabFallback: { color: Colors.onBrand },
 });

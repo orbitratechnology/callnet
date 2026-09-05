@@ -2,68 +2,66 @@ import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
 import { Avatar } from '@/components/avatar';
+import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, MaxContentWidth, Radius, Shadows, Spacing } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-provider';
 import { getUserProfile, type UserProfile } from '@/features/profile/profile-service';
+import { strings } from '@/localization/strings';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      return;
-    }
+    if (!user) return;
     void getUserProfile(user.uid).then(setProfile).catch(() => setProfile(null));
-  }, [user]);
+  }, [user?.uid]);
+
+  const displayName = profile?.displayName ?? user?.displayName ?? strings.profile.accountFallback;
+  const photoURL = profile?.photoURL ?? user?.photoURL;
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Profile' }} />
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
+      <Stack.Screen options={{ title: strings.profile.screenTitle, headerLargeTitle: true }} />
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.content}
+      >
         <View style={styles.container}>
-          <ThemedText variant="title">Your profile</ThemedText>
+          <View style={styles.hero}>
+            <Avatar initials={getInitials(displayName)} photoURL={photoURL} size="xl" />
+            <View style={styles.heroCopy}>
+              <ThemedText variant="title">{displayName}</ThemedText>
+              {profile?.username ? (
+                <ThemedText variant="body" tone="brand">@{profile.username}</ThemedText>
+              ) : null}
+              <ThemedText variant="subhead" tone="secondary" selectable>
+                {user?.email ?? strings.profile.emailUnavailable}
+              </ThemedText>
+            </View>
+          </View>
+
           <ThemedText variant="body" tone="secondary" selectable>
-            Your account is used to identify you securely for calls across devices.
+            {strings.profile.identityCopy}
           </ThemedText>
-          <View style={styles.accountCard}>
-            <Avatar
-              initials={getInitials(profile?.displayName ?? user?.displayName ?? 'User')}
-              photoURL={profile?.photoURL ?? user?.photoURL}
-              size="lg"
-            />
-            <ThemedText variant="headline">{user?.displayName || 'Callnet account'}</ThemedText>
-            {profile?.username ? <ThemedText variant="subhead" tone="secondary">@{profile.username}</ThemedText> : null}
-            <ThemedText variant="subhead" tone="secondary" selectable>{user?.email ?? 'Email not available'}</ThemedText>
-            <ThemedText variant="caption" tone="secondary">
-              Share your @username so people can find you securely.
-            </ThemedText>
+          <ThemedText variant="caption" tone="secondary">
+            {strings.profile.usernameHint}
+          </ThemedText>
+
+          <View style={styles.section}>
+            <ThemedText variant="caption" tone="brand">{strings.profile.privacyLabel}</ThemedText>
+            <ThemedText variant="headline">{strings.profile.privacyHeading}</ThemedText>
+            <View style={styles.privacyList}>
+              <PrivacyRow title={strings.profile.privacy.media} description={strings.profile.privacy.mediaCopy} />
+              <PrivacyRow title={strings.profile.privacy.connections} description={strings.profile.privacy.connectionsCopy} />
+              <PrivacyRow title={strings.profile.privacy.history} description={strings.profile.privacy.historyCopy} />
+              <PrivacyRow title={strings.profile.privacy.permissions} description={strings.profile.privacy.permissionsCopy} />
+            </View>
           </View>
-          <View style={styles.privacyCard}>
-            <ThemedText variant="caption" tone="brand">PRIVACY</ThemedText>
-            <ThemedText variant="headline">Clear, limited data handling</ThemedText>
-            <PrivacyRow
-              title="Media"
-              description="Calls use WebRTC. Callnet does not record audio or video."
-            />
-            <PrivacyRow
-              title="Connections"
-              description="Direct connections are preferred. TURN may relay encrypted media when needed."
-            />
-            <PrivacyRow
-              title="Call history"
-              description="Detailed recent-call history is kept locally on this device."
-            />
-            <PrivacyRow
-              title="Permissions"
-              description="Microphone and camera access are requested only when a call needs them."
-            />
-          </View>
-          <View style={styles.divider} />
-          <Button title="Sign out" variant="ghost" onPress={() => void signOut()} />
+
+          <Button title={strings.profile.signOut} variant="ghost" onPress={() => void signOut()} />
         </View>
       </ScrollView>
     </>
@@ -72,11 +70,39 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: Spacing.lg },
-  container: { gap: Spacing.lg },
-  accountCard: { gap: Spacing.sm, padding: Spacing.md, backgroundColor: Colors.secondaryBackground, borderRadius: Radius.md },
-  privacyCard: { gap: Spacing.md, padding: Spacing.md, backgroundColor: Colors.secondaryBackground, borderRadius: Radius.md },
-  privacyRow: { gap: Spacing.xs },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.separator },
+  container: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    gap: Spacing.lg,
+  },
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.lg,
+    padding: Spacing.lg,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.secondaryBackground,
+    boxShadow: Shadows.card,
+  },
+  heroCopy: { flex: 1, gap: Spacing.xs },
+  section: {
+    gap: Spacing.sm,
+    paddingTop: Spacing.sm,
+  },
+  privacyList: {
+    overflow: 'hidden',
+    borderRadius: Radius.md,
+    backgroundColor: Colors.secondaryBackground,
+    boxShadow: Shadows.card,
+  },
+  privacyRow: {
+    gap: Spacing.xs,
+    padding: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.separator,
+  },
+  lastPrivacyRow: { borderBottomWidth: 0 },
 });
 
 function getInitials(name: string) {
@@ -90,8 +116,9 @@ function getInitials(name: string) {
 }
 
 function PrivacyRow({ title, description }: { title: string; description: string }) {
+  const isLast = title === strings.profile.privacy.permissions;
   return (
-    <View style={styles.privacyRow}>
+    <View style={[styles.privacyRow, isLast ? styles.lastPrivacyRow : null]}>
       <ThemedText variant="headline">{title}</ThemedText>
       <ThemedText variant="subhead" tone="secondary" selectable>{description}</ThemedText>
     </View>

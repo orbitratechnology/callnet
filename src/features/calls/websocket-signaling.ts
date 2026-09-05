@@ -5,7 +5,11 @@ import {
   type ServerSignalingMessage,
 } from '../../../shared/signaling-protocol';
 import type { CallEvent } from '../../../shared/call-protocol';
-import type { AuthenticatedSignalingIdentity, SignalingTransport } from './signaling-transport';
+import type {
+  AuthenticatedSignalingIdentity,
+  SignalingTransport,
+  SignalingTransportStatus,
+} from './signaling-transport';
 
 const SOCKET_OPEN = 1;
 const DEFAULT_CONNECT_TIMEOUT_MS = 8_000;
@@ -112,6 +116,7 @@ function defaultWebSocketFactory(url: string, protocols: string[]): WebSocketLik
 
 export class WebSocketSignalingTransport implements SignalingTransport {
   private readonly listeners = new Set<(event: CallEvent) => void>();
+  private readonly statusListeners = new Set<(status: SignalingTransportStatus) => void>();
   private readonly options: ResolvedWebSocketSignalingOptions;
   private readonly queue: PendingEvent[] = [];
   private readonly pending = new Map<string, PendingEvent>();
@@ -122,6 +127,7 @@ export class WebSocketSignalingTransport implements SignalingTransport {
   private reconnectAttempts = 0;
   private shouldReconnect = false;
   private rejectOpeningConnection: ((error: Error) => void) | null = null;
+  private status: SignalingTransportStatus = 'offline';
 
   constructor(options: WebSocketSignalingOptions) {
     this.options = {
@@ -154,6 +160,7 @@ export class WebSocketSignalingTransport implements SignalingTransport {
     this.identity = identity;
     this.shouldReconnect = true;
     this.reconnectAttempts = 0;
+    this.setStatus('connecting');
     if (this.connectPromise) {
       return this.connectPromise;
     }
@@ -164,6 +171,7 @@ export class WebSocketSignalingTransport implements SignalingTransport {
       await promise;
     } catch (error) {
       this.shouldReconnect = false;
+      this.setStatus('offline');
       throw error;
     } finally {
       if (this.connectPromise === promise) {
@@ -216,9 +224,18 @@ export class WebSocketSignalingTransport implements SignalingTransport {
     };
   }
 
+  subscribeStatus(listener: (status: SignalingTransportStatus) => void): () => void {
+    this.statusListeners.add(listener);
+    listener(this.status);
+    return () => {
+      this.statusListeners.delete(listener);
+    };
+  }
+
   async disconnect(): Promise<void> {
     this.shouldReconnect = false;
     this.reconnectAttempts = 0;
+    this.setStatus('offline');
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -248,6 +265,8 @@ export class WebSocketSignalingTransport implements SignalingTransport {
     if (!identity) {
       return Promise.reject(new SignalingTransportError('Signaling identity is missing.', 'not-connected'));
     }
+
+    this.setStatus(isReconnect ? 'reconnecting' : 'connecting');
 
     let socket: WebSocketLike;
     try {
@@ -296,6 +315,8 @@ export class WebSocketSignalingTransport implements SignalingTransport {
         }
         if (isReconnect && this.shouldReconnect) {
           this.scheduleReconnect();
+        } else {
+          this.setStatus('offline');
         }
         reject(error);
       };
@@ -309,6 +330,7 @@ export class WebSocketSignalingTransport implements SignalingTransport {
         this.socket = socket;
         this.rejectOpeningConnection = null;
         this.reconnectAttempts = 0;
+        this.setStatus('connected');
         this.flushQueue();
         resolve();
       };
@@ -444,7 +466,10 @@ export class WebSocketSignalingTransport implements SignalingTransport {
     this.socket = null;
     this.requeueInFlight();
     if (this.shouldReconnect) {
+      this.setStatus('reconnecting');
       this.scheduleReconnect();
+    } else {
+      this.setStatus('offline');
     }
   }
 
@@ -473,10 +498,13 @@ export class WebSocketSignalingTransport implements SignalingTransport {
   private scheduleReconnect(): void {
     if (!this.shouldReconnect || this.reconnectTimer || this.reconnectAttempts >= this.options.maxReconnectAttempts) {
       if (this.reconnectAttempts >= this.options.maxReconnectAttempts) {
+        this.setStatus('offline');
         this.rejectAll(new SignalingTransportError('Signaling reconnect limit reached.', 'reconnect-exhausted'));
       }
       return;
     }
+
+    this.setStatus('reconnecting');
 
     const exponentialDelay = Math.min(
       this.options.reconnectMaxDelayMs,
@@ -505,6 +533,21 @@ export class WebSocketSignalingTransport implements SignalingTransport {
       item.queued = false;
       item.inFlight = false;
       item.reject(error);
+    });
+  }
+
+  private setStatus(status: SignalingTransportStatus): void {
+    if (this.status === status) {
+      return;
+    }
+
+    this.status = status;
+    this.statusListeners.forEach((listener) => {
+      try {
+        listener(status);
+      } catch {
+        // A status subscriber must not break transport lifecycle handling.
+      }
     });
   }
 }

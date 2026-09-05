@@ -26,6 +26,8 @@ The normal calling flow uses the deployed Worker configured in `EXPO_PUBLIC_SIGN
 
 Native incoming-call UI is provided by `expo-callkit-telecom` on iOS CallKit and Android Core-Telecom. It requires a development-client rebuild after dependency or config changes; see [docs/native-calls.md](docs/native-calls.md).
 
+The current implementation and remaining production gates are tracked in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). APNs setup, native rebuilds, and physical-device acceptance remain intentionally deferred until explicitly scheduled.
+
 ## Authenticated calling flow
 
 Create or sign in to a real Firebase email/password or Google account on each device. Email accounts choose a username; Google accounts receive a readable handle derived from the Google name or account email. Find the other person by exact username, then start a voice or video call. No development identity is accepted by the authenticated signaling server.

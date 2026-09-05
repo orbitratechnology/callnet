@@ -9,7 +9,7 @@ export default defineConfig({
         CallSession: 'DurableObject',
         UserSession: 'DurableObject',
       },
-      miniflare: { compatibilityDate: '2026-08-15' },
+      miniflare: { compatibilityDate: '2026-09-06' },
     }),
   ],
 });

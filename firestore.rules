@@ -46,6 +46,7 @@ service cloud.firestore {
         getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == request.auth.uid;
       allow update: if isOwner(userId) &&
         isValidProfile(request.resource.data) &&
+        resource.data.uid == userId &&
         request.resource.data.uid == resource.data.uid &&
         request.resource.data.createdAt == resource.data.createdAt &&
         (request.resource.data.username == resource.data.username ||

@@ -11,11 +11,21 @@ import { GoogleSignInButton } from 'react-native-nitro-google-signin';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { Colors, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { Colors, MaxContentWidth, Radius, Shadows, Spacing, useBrandColors } from '@/constants/theme';
+import { isValidUsername, normalizeUsername } from '@/features/profile/profile-service';
+import { strings } from '@/localization/strings';
 
 import { useAuth } from './auth-provider';
 import { getAuthErrorMessage } from './auth-service';
-import { isValidUsername, normalizeUsername } from '@/features/profile/profile-service';
+
+function BrandMark() {
+  const brand = useBrandColors();
+  return (
+    <View style={[styles.brandMark, { backgroundColor: brand.accentSoft }]}>
+      <ThemedText variant="title" style={{ color: brand.accentContrast }}>C</ThemedText>
+    </View>
+  );
+}
 
 export function AuthScreen() {
   const { signInWithGoogle, signInWithEmail, createEmailAccount } = useAuth();
@@ -31,15 +41,15 @@ export function AuthScreen() {
 
   const submit = async () => {
     if (!email.trim() || !password) {
-      setError('Enter your email and password.');
+      setError(strings.auth.errors.emailPassword);
       return;
     }
     if (isCreateMode && !displayName.trim()) {
-      setError('Enter a display name.');
+      setError(strings.auth.errors.displayName);
       return;
     }
     if (isCreateMode && !isValidUsername(normalizeUsername(username))) {
-      setError('Choose a username with 3–30 letters, numbers, dots, dashes, or underscores.');
+      setError(strings.auth.errors.username);
       return;
     }
 
@@ -80,129 +90,144 @@ export function AuthScreen() {
       style={styles.screen}
       behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.card}>
-          <View style={styles.intro}>
-            <ThemedText variant="largeTitle">Callnet</ThemedText>
-            <ThemedText variant="title">
-              {isCreateMode ? 'Create your account.' : 'Private calls, made simple.'}
-            </ThemedText>
-            <ThemedText variant="body" tone="secondary">
-              {isCreateMode
-                ? 'Create a Callnet identity to call people you know from any of your devices.'
-                : 'Sign in to call people you know from any of your devices.'}
-            </ThemedText>
-          </View>
-
-          {process.env.EXPO_OS === 'web' ? (
-            <Button
-              title="Continue with Google"
-              variant="secondary"
-              size="lg"
-              loading={isGoogleSubmitting}
-              disabled={isSubmitting}
-              onPress={() => void signInGoogle()}
-            />
-          ) : (
-            <GoogleSignInButton
-              signInBehavior="none"
-              colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
-              size="wide"
-              contentAlignment="center"
-              loading={isGoogleSubmitting}
-              disabled={isSubmitting}
-              accessibilityLabel="Continue with Google"
-              style={styles.googleButton}
-              onPress={() => void signInGoogle()}
-            />
-          )}
-          <ThemedText variant="caption" tone="secondary" style={styles.dividerLabel}>
-            OR USE EMAIL
-          </ThemedText>
-
-          {isCreateMode ? (
-            <View style={styles.field}>
-              <ThemedText variant="caption" tone="secondary">Display name</ThemedText>
-              <TextInput
-                value={displayName}
-                onChangeText={setDisplayName}
-                placeholder="How people will see you"
-                placeholderTextColor={Colors.secondaryLabel}
-                style={styles.input}
-                autoCapitalize="words"
-                returnKeyType="next"
-              />
-            </View>
-          ) : null}
-          {isCreateMode ? (
-            <View style={styles.field}>
-              <ThemedText variant="caption" tone="secondary">Callnet username</ThemedText>
-              <TextInput
-                value={username}
-                onChangeText={setUsername}
-                placeholder="your.handle"
-                placeholderTextColor={Colors.secondaryLabel}
-                style={styles.input}
-                autoCapitalize="none"
-                autoCorrect={false}
-                textContentType="username"
-                returnKeyType="next"
-              />
-              <ThemedText variant="caption" tone="secondary">
-                3–30 characters: letters, numbers, dots, dashes, or underscores.
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.shell}>
+          <View style={styles.header}>
+            <BrandMark />
+            <View style={styles.intro}>
+              <ThemedText variant="largeTitle">
+                {isCreateMode ? strings.auth.createTitle : strings.auth.signInTitle}
+              </ThemedText>
+              <ThemedText variant="body" tone="secondary" selectable>
+                {isCreateMode ? strings.auth.createCopy : strings.auth.signInCopy}
               </ThemedText>
             </View>
-          ) : null}
-          <View style={styles.field}>
-            <ThemedText variant="caption" tone="secondary">Email</ThemedText>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              placeholderTextColor={Colors.secondaryLabel}
-              style={styles.input}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              returnKeyType="next"
-            />
-          </View>
-          <View style={styles.field}>
-            <ThemedText variant="caption" tone="secondary">Password</ThemedText>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder={isCreateMode ? 'At least 6 characters' : 'Your password'}
-              placeholderTextColor={Colors.secondaryLabel}
-              style={styles.input}
-              secureTextEntry
-              textContentType={isCreateMode ? 'newPassword' : 'password'}
-              returnKeyType="done"
-              onSubmitEditing={() => void submit()}
-            />
           </View>
 
-          {error ? (
-            <View style={styles.errorBox} accessible accessibilityRole="alert">
-              <ThemedText variant="caption" tone="destructive">Couldn’t continue</ThemedText>
-              <ThemedText variant="subhead" tone="destructive" selectable>{error}</ThemedText>
+          <View style={styles.formCard}>
+            {process.env.EXPO_OS === 'web' ? (
+              <Button
+                title={strings.auth.google}
+                variant="secondary"
+                size="lg"
+                loading={isGoogleSubmitting}
+                disabled={isSubmitting}
+                onPress={() => void signInGoogle()}
+              />
+            ) : (
+              <GoogleSignInButton
+                signInBehavior="none"
+                colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
+                size="wide"
+                contentAlignment="center"
+                loading={isGoogleSubmitting}
+                disabled={isSubmitting}
+                accessibilityLabel={strings.auth.google}
+                style={styles.googleButton}
+                onPress={() => void signInGoogle()}
+              />
+            )}
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <ThemedText variant="caption" tone="secondary">{strings.auth.emailDivider}</ThemedText>
+              <View style={styles.dividerLine} />
             </View>
-          ) : null}
 
-          <Button
-            title={isCreateMode ? 'Create account' : 'Sign in'}
-            size="lg"
-            loading={isSubmitting}
-            disabled={isGoogleSubmitting}
-            onPress={() => void submit()}
-          />
-          <Button
-            title={isCreateMode ? 'I already have an account' : 'Create a new account'}
-            variant="ghost"
-            disabled={isSubmitting || isGoogleSubmitting}
-            onPress={toggleMode}
-          />
+            {isCreateMode ? (
+              <View style={styles.field}>
+                <ThemedText variant="caption" tone="secondary">{strings.auth.displayNameLabel}</ThemedText>
+                <TextInput
+                  value={displayName}
+                  onChangeText={setDisplayName}
+                  placeholder={strings.auth.displayNamePlaceholder}
+                  placeholderTextColor={Colors.secondaryLabel}
+                  style={styles.input}
+                  accessibilityLabel={strings.auth.displayNameLabel}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+              </View>
+            ) : null}
+            {isCreateMode ? (
+              <View style={styles.field}>
+                <ThemedText variant="caption" tone="secondary">{strings.auth.usernameLabel}</ThemedText>
+                <TextInput
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder={strings.auth.usernamePlaceholder}
+                  placeholderTextColor={Colors.secondaryLabel}
+                  style={styles.input}
+                  accessibilityLabel={strings.auth.usernameLabel}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="username"
+                  returnKeyType="next"
+                />
+                <ThemedText variant="caption" tone="secondary">{strings.auth.usernameHint}</ThemedText>
+              </View>
+            ) : null}
+            <View style={styles.field}>
+              <ThemedText variant="caption" tone="secondary">{strings.auth.emailLabel}</ThemedText>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder={strings.auth.emailPlaceholder}
+                placeholderTextColor={Colors.secondaryLabel}
+                style={styles.input}
+                accessibilityLabel={strings.auth.emailLabel}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                returnKeyType="next"
+              />
+            </View>
+            <View style={styles.field}>
+              <ThemedText variant="caption" tone="secondary">{strings.auth.passwordLabel}</ThemedText>
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder={isCreateMode ? strings.auth.passwordPlaceholderCreate : strings.auth.passwordPlaceholderSignIn}
+                placeholderTextColor={Colors.secondaryLabel}
+                style={styles.input}
+                accessibilityLabel={strings.auth.passwordLabel}
+                secureTextEntry
+                textContentType={isCreateMode ? 'newPassword' : 'password'}
+                returnKeyType="done"
+                onSubmitEditing={() => void submit()}
+              />
+            </View>
+
+            {error ? (
+              <View style={styles.errorBox} accessible accessibilityRole="alert">
+                <ThemedText variant="caption" tone="destructive">{strings.auth.errorTitle}</ThemedText>
+                <ThemedText variant="subhead" tone="destructive" selectable>{error}</ThemedText>
+              </View>
+            ) : null}
+
+            <Button
+              title={isCreateMode ? strings.auth.createAccount : strings.auth.signIn}
+              size="lg"
+              loading={isSubmitting}
+              disabled={isGoogleSubmitting}
+              onPress={() => void submit()}
+            />
+            <Button
+              title={isCreateMode ? strings.auth.switchToSignIn : strings.auth.switchToCreate}
+              variant="ghost"
+              disabled={isSubmitting || isGoogleSubmitting}
+              onPress={toggleMode}
+            />
+          </View>
+
+          <View style={styles.privacyNote}>
+            <ThemedText variant="caption" tone="brand">{strings.auth.privateByDesign}</ThemedText>
+            <ThemedText variant="subhead" tone="secondary" selectable>{strings.auth.privacyCopy}</ThemedText>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -211,20 +236,48 @@ export function AuthScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.systemBackground },
-  content: { flexGrow: 1, justifyContent: 'center', padding: Spacing.lg },
-  card: {
+  content: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: Spacing.lg,
+  },
+  shell: {
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
+    gap: Spacing.lg,
+  },
+  header: { gap: Spacing.lg, paddingHorizontal: Spacing.xs },
+  brandMark: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.full,
+  },
+  intro: { gap: Spacing.sm },
+  formCard: {
     gap: Spacing.md,
     padding: Spacing.lg,
     borderRadius: Radius.lg,
     backgroundColor: Colors.secondaryBackground,
+    boxShadow: Shadows.card,
   },
-  intro: { gap: Spacing.sm, paddingBottom: Spacing.md },
-  dividerLabel: { textAlign: 'center', paddingVertical: Spacing.xs },
-  googleButton: { alignSelf: 'center' },
+  googleButton: { alignSelf: 'stretch' },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: Colors.separator },
   field: { gap: Spacing.xs },
+  input: {
+    minHeight: 52,
+    paddingHorizontal: Spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.separator,
+    borderRadius: Radius.md,
+    borderCurve: 'continuous',
+    color: Colors.label,
+    backgroundColor: Colors.systemBackground,
+    fontSize: 16,
+  },
   errorBox: {
     gap: Spacing.xs,
     padding: Spacing.md,
@@ -233,14 +286,5 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.destructive,
   },
-  input: {
-    minHeight: 52,
-    paddingHorizontal: Spacing.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.separator,
-    borderRadius: Radius.md,
-    color: Colors.label,
-    backgroundColor: Colors.systemBackground,
-    fontSize: 16,
-  },
+  privacyNote: { gap: Spacing.xs, paddingHorizontal: Spacing.xs },
 });

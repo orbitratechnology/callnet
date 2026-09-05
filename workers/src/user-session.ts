@@ -213,28 +213,34 @@ export class UserSession extends DurableObject<Env> {
       return Response.json({ delivered: false }, { status: 400 });
     }
 
-    try {
-      const value: unknown = JSON.parse(text);
-      if (!isServerSignalingMessage(value) || value.kind !== 'call:event' || value.event.to !== targetUid) {
+    return this.ctx.blockConcurrencyWhile(async () => {
+      try {
+        const value: unknown = JSON.parse(text);
+        if (!isServerSignalingMessage(value) || value.kind !== 'call:event' || value.event.to !== targetUid) {
+          return Response.json({ delivered: false }, { status: 400 });
+        }
+
+        if (value.event.type === 'call:invite' && this.hasOtherActiveCall(value.event.callId)) {
+          return Response.json({ delivered: false, code: 'peer-busy' }, { status: 409 });
+        }
+
+        const sockets = this.ctx.getWebSockets().filter((socket) => socket.readyState === 1);
+        if (sockets.length === 0) {
+          return Response.json({ delivered: false }, { status: 404 });
+        }
+
+        const frame = JSON.stringify(value);
+        sockets.forEach((socket) => socket.send(frame));
+        if (isTerminalCallEvent(value.event)) {
+          this.forgetCall(value.event.callId);
+        } else {
+          this.rememberCall(value.event.callId);
+        }
+        return Response.json({ delivered: true });
+      } catch {
         return Response.json({ delivered: false }, { status: 400 });
       }
-
-      const sockets = this.ctx.getWebSockets().filter((socket) => socket.readyState === 1);
-      if (sockets.length === 0) {
-        return Response.json({ delivered: false }, { status: 404 });
-      }
-
-      const frame = JSON.stringify(value);
-      sockets.forEach((socket) => socket.send(frame));
-      if (isTerminalCallEvent(value.event)) {
-        this.forgetCall(value.event.callId);
-      } else {
-        this.rememberCall(value.event.callId);
-      }
-      return Response.json({ delivered: true });
-    } catch {
-      return Response.json({ delivered: false }, { status: 400 });
-    }
+    });
   }
 
   private getUid(webSocket: WebSocket): string | null {
@@ -250,6 +256,12 @@ export class UserSession extends DurableObject<Env> {
 
   private rememberCall(callId: string): void {
     this.ctx.storage.sql.exec('INSERT OR IGNORE INTO active_call (call_id) VALUES (?)', callId);
+  }
+
+  private hasOtherActiveCall(callId: string): boolean {
+    return this.ctx.storage.sql
+      .exec<{ call_id: string }>('SELECT call_id FROM active_call WHERE call_id != ? LIMIT 1', callId)
+      .toArray().length > 0;
   }
 
   private forgetCall(callId: string): void {

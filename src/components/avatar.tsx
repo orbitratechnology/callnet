@@ -1,28 +1,50 @@
 import { Image } from 'expo-image';
-import { StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 import { useEffect, useState } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
 import { Radius, Spacing, useBrandColors } from '@/constants/theme';
 
-export type AvatarProps = { initials: string; photoURL?: string | null; size?: 'sm' | 'md' | 'lg' };
+export type AvatarProps = {
+  initials: string;
+  photoURL?: string | null;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  accessible?: boolean;
+  accessibilityLabel?: string;
+};
 
-export function Avatar({ initials, photoURL, size = 'md' }: AvatarProps) {
+export function Avatar({ initials, photoURL, size = 'md', accessible = true, accessibilityLabel }: AvatarProps) {
   const brand = useBrandColors();
   const [imageFailed, setImageFailed] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
     setImageFailed(false);
   }, [photoURL]);
+
+  useEffect(() => {
+    let mounted = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) {
+        setReduceMotion(enabled);
+      }
+    });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
 
   const showImage = Boolean(photoURL && !imageFailed);
 
   return (
     <View
       style={[styles.base, styles[size], { backgroundColor: brand.accentSoft }]}
-      accessible
+      accessible={accessible}
       accessibilityRole="image"
-      accessibilityLabel={showImage ? 'Profile picture' : `${initials} avatar`}
+      accessibilityLabel={accessibilityLabel ?? (showImage ? 'Profile picture' : `${initials} avatar`)}
     >
       {showImage ? (
         <Image
@@ -30,13 +52,13 @@ export function Avatar({ initials, photoURL, size = 'md' }: AvatarProps) {
           style={styles.image}
           contentFit="cover"
           cachePolicy="memory-disk"
-          transition={150}
+          transition={reduceMotion ? 0 : 150}
           accessible={false}
           accessibilityIgnoresInvertColors
           onError={() => setImageFailed(true)}
         />
       ) : (
-        <ThemedText variant={size === 'lg' ? 'title' : 'headline'} style={{ color: brand.accentContrast }}>
+        <ThemedText variant={size === 'lg' || size === 'xl' ? 'title' : 'headline'} style={{ color: brand.accentContrast }}>
           {initials.slice(0, 2).toUpperCase()}
         </ThemedText>
       )}
@@ -50,4 +72,5 @@ const styles = StyleSheet.create({
   sm: { width: 40, height: 40 },
   md: { width: 52, height: 52 },
   lg: { width: 96, height: 96, padding: Spacing.sm },
+  xl: { width: 112, height: 112, padding: Spacing.sm },
 });

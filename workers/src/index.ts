@@ -3,6 +3,7 @@ import { verifyFirebaseIdToken } from './firebase-token';
 import { getFirebaseTokenFromSubprotocolHeader, SIGNALING_SUBPROTOCOL } from './protocol';
 import { UserSession } from './user-session';
 import { fetchMeteredIceServers } from './turn-credentials';
+import { redactDiagnostic } from '../../shared/diagnostics';
 
 export { CallSession, UserSession };
 
@@ -10,7 +11,10 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
-      return Response.json({ service: 'callnet-signaling', status: 'ok' });
+      return Response.json(
+        { service: 'callnet-signaling', status: 'ok' },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
     }
 
     if (request.method === 'GET' && url.pathname === '/ice-servers') {
@@ -72,7 +76,7 @@ export default {
       console.warn(
         JSON.stringify({
           event: 'firebase_token_rejected',
-          reason: error instanceof Error ? error.message : 'unknown',
+          reason: redactDiagnostic(error, 96) || 'unknown',
         }),
       );
       return new Response('Unauthorized.', { status: 401, headers: { 'Cache-Control': 'no-store' } });

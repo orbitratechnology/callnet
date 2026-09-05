@@ -1,6 +1,6 @@
 # Callnet Phase 6B — Background push delivery
 
-Status: implemented in source; credentials, deployment, native rebuild, and device verification are pending.
+Status: implemented in source and deployed to the Worker; native rebuild and device verification are pending.
 
 ## Completed
 
@@ -32,7 +32,7 @@ The APNs values are optional for an Android-only deployment, but iOS background 
 - [x] Ran `bun x wrangler types --config workers/wrangler.jsonc` after config changes.
 - [x] Ran bounded Worker checks and deployed the Worker after the required secrets existed.
 - [x] Verified `https://callnet-signaling.orbitra-technology.workers.dev/health` returned `status: ok`.
-- [ ] Rebuild the development client after dependencies/config changes.
+- [ ] Rebuild the development client after dependencies/config changes (intentionally deferred).
 - [ ] Verify foreground, background, locked-device, answer, reject, timeout, and end behavior on both platforms.
 - [ ] Confirm killed-app decline propagation on a physical Android device after rebuilding the development client.
 

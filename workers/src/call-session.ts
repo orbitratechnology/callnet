@@ -10,6 +10,7 @@ import {
   type ServerSignalingMessage,
 } from './protocol';
 import { dispatchOfflineCallInvitePush } from './push-dispatch';
+import { redactIdentifier } from '../../shared/diagnostics';
 
 const INTERNAL_EVENT = 'user-session-event';
 const INTERNAL_DISCONNECT = 'user-session-disconnect';
@@ -37,6 +38,7 @@ type CallSessionResult = {
 
 type DeliveryResult = {
   delivered: boolean;
+  code?: string;
 };
 
 function jsonResponse(value: CallSessionResult, status = 200): Response {
@@ -52,7 +54,9 @@ function isCallSessionResult(value: unknown): value is CallSessionResult {
 }
 
 function isDeliveryResult(value: unknown): value is DeliveryResult {
-  return isRecord(value) && typeof value.delivered === 'boolean';
+  return isRecord(value) &&
+    typeof value.delivered === 'boolean' &&
+    (value.code === undefined || typeof value.code === 'string');
 }
 
 function isTerminalEvent(type: CallEventType): type is TerminalCallEventType {
@@ -253,7 +257,13 @@ export class CallSession extends DurableObject<Env> {
       saveSession(this.ctx, session);
       await this.ctx.storage.setAlarm(timestamp + INVITE_TIMEOUT_MS);
 
-      if (!(await this.deliverEvent(event))) {
+      const delivery = await this.deliverEvent(event);
+      if (!delivery.delivered) {
+        if (delivery.code === 'peer-busy') {
+          deleteSession(this.ctx);
+          await this.ctx.storage.deleteAlarm();
+          return jsonResponse({ ok: false, code: 'peer-busy' }, 409);
+        }
         const pushResult = await dispatchOfflineCallInvitePush(this.env, event);
         if (!pushResult.delivered) {
           deleteSession(this.ctx);
@@ -263,8 +273,8 @@ export class CallSession extends DurableObject<Env> {
 
         console.info(JSON.stringify({
           event: 'call_invite_push_delivered',
-          callId: event.callId,
-          targetUid: event.to,
+          callId: redactIdentifier(event.callId),
+          targetUid: redactIdentifier(event.to),
           attempted: pushResult.attempted,
           succeeded: pushResult.succeeded,
         }));
@@ -297,7 +307,7 @@ export class CallSession extends DurableObject<Env> {
 
       const connected = { ...existing, state: 'connected' as const, updatedAt: Date.now() };
       saveSession(this.ctx, connected);
-      if (!(await this.deliverEvent(event))) {
+      if (!(await this.deliverEvent(event)).delivered) {
         saveSession(this.ctx, existing);
         return jsonResponse({ ok: false, code: 'peer-offline' }, 409);
       }
@@ -312,7 +322,7 @@ export class CallSession extends DurableObject<Env> {
         return jsonResponse({ ok: false, code: 'invalid-call-state' }, 409);
       }
 
-      if (!(await this.deliverEvent(event))) {
+      if (!(await this.deliverEvent(event)).delivered) {
         return jsonResponse({ ok: false, code: 'peer-offline' }, 409);
       }
       deleteSession(this.ctx);
@@ -327,7 +337,8 @@ export class CallSession extends DurableObject<Env> {
       return jsonResponse({ ok: false, code: 'invalid-call-state' }, 409);
     }
 
-    return (await this.deliverEvent(event))
+    const delivery = await this.deliverEvent(event);
+    return delivery.delivered
       ? jsonResponse({ ok: true })
       : jsonResponse({ ok: false, code: 'peer-offline' }, 409);
   }
@@ -362,7 +373,7 @@ export class CallSession extends DurableObject<Env> {
     });
   }
 
-  private async deliverEvent(event: CallEvent): Promise<boolean> {
+  private async deliverEvent(event: CallEvent): Promise<DeliveryResult> {
     const message: ServerSignalingMessage = {
       version: SIGNALING_PROTOCOL_VERSION,
       kind: 'call:event',
@@ -381,14 +392,14 @@ export class CallSession extends DurableObject<Env> {
     );
 
     if (!response.ok) {
-      return false;
+      return { delivered: false };
     }
 
     try {
       const value: unknown = await response.json();
-      return isDeliveryResult(value) && value.delivered;
+      return isDeliveryResult(value) ? value : { delivered: false };
     } catch {
-      return false;
+      return { delivered: false };
     }
   }
 }

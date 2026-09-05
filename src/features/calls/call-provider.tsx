@@ -190,6 +190,18 @@ export function CallProvider({
       return;
     }
 
+    if (event.type === 'transport') {
+      if (event.status === 'connected') {
+        setTransportStatus('connected');
+      } else if (event.status === 'offline') {
+        setTransportStatus('offline');
+        setTransportError('Signaling connection lost. Retry when your connection is available.');
+      } else {
+        setTransportStatus('connecting');
+      }
+      return;
+    }
+
     if (event.type === 'incoming') {
       const existingContact = contacts.find((contact) => contact.identityId === event.from);
       const person = existingContact
