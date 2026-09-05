@@ -24,6 +24,11 @@ export default {
 
       try {
         await verifyFirebaseIdToken(token, env.FIREBASE_PROJECT_ID);
+      } catch {
+        return new Response('Unauthorized.', { status: 401, headers: { 'Cache-Control': 'no-store' } });
+      }
+
+      try {
         const iceServers = await fetchMeteredIceServers(env);
         return Response.json(iceServers, {
           headers: { 'Cache-Control': 'no-store' },
@@ -32,7 +37,7 @@ export default {
         console.warn(
           JSON.stringify({
             event: 'ice_servers_request_failed',
-            reason: error instanceof Error ? error.message : 'unknown',
+            reason: 'turn-provider-unavailable',
           }),
         );
         return new Response('Unable to provide ICE servers.', {

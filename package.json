@@ -45,13 +45,14 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "doppler run -- expo start",
+    "start": "doppler run --preserve-env=false -- bun x expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "doppler run -- expo run:android",
-    "ios": "doppler run -- expo run:ios",
-    "prebuild": "doppler run -- expo prebuild",
-    "web": "doppler run -- expo start --web",
-    "lint": "expo lint"
+    "android": "doppler run --preserve-env=false -- bun x expo run:android",
+    "ios": "doppler run --preserve-env=false -- bun x expo run:ios",
+    "prebuild": "doppler run --preserve-env=false -- bun x expo prebuild",
+    "web": "doppler run --preserve-env=false -- bun x expo start --web",
+    "lint": "doppler run --preserve-env=false -- bun x expo lint",
+    "worker:sync-secrets": "doppler run --project callnet --config prd --preserve-env=false -- powershell -NoProfile -ExecutionPolicy Bypass -File ./workers/scripts/sync-worker-secrets.ps1"
   },
   "private": true
 }

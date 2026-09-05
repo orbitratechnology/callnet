@@ -66,21 +66,48 @@ export async function fetchMeteredIceServers(env: object): Promise<IceServerConf
   }
 
   const url = new URL(endpoint);
+  if (url.protocol !== 'https:' || !url.hostname.endsWith('.metered.live') || url.username || url.password) {
+    throw new Error('turn-provider-url-invalid');
+  }
   url.searchParams.set('apiKey', apiKey);
 
-  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    redirect: 'error',
+    signal: AbortSignal.timeout(8_000),
+  });
   if (!response.ok) {
     throw new Error(`turn-provider-http-${response.status}`);
   }
 
-  const body = await response.arrayBuffer();
-  if (body.byteLength > MAX_RESPONSE_BYTES) {
-    throw new Error('turn-provider-response-too-large');
+  return readIceServersResponse(response);
+}
+
+export async function readIceServersResponse(response: Response): Promise<IceServerConfig[]> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('turn-provider-response-invalid');
+  const decoder = new TextDecoder();
+  let text = '';
+  let bytes = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error('turn-provider-response-too-large');
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+  } finally {
+    reader.releaseLock();
   }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(new TextDecoder().decode(body)) as unknown;
+    parsed = JSON.parse(text) as unknown;
   } catch {
     throw new Error('turn-provider-response-invalid');
   }
