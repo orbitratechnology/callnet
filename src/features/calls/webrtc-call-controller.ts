@@ -21,6 +21,11 @@ import {
 import type { SignalingTransport } from './signaling-transport';
 import { WebSocketSignalingTransport } from './websocket-signaling';
 import { nativeCallUi, type NativeCallUi, type NativeCallUiEvent } from './native-call-ui';
+import {
+  acknowledgePendingCallEvents,
+  getPendingCallEvents,
+  type PendingCallEndedEvent,
+} from '../../../modules/callnet-background-events';
 
 export type RealCallControllerEvent =
   | { type: 'incoming'; callId: string; kind: CallKind; from: CallIdentityId; profile: CallProfile; timestamp: number }
@@ -101,6 +106,7 @@ export class WebRTCCallController {
     this.unsubscribeFromTransport = this.transport.subscribe((event) => void this.handleEvent(event));
     await this.transport.connect({ identity: this.identity, idToken: this.authToken });
     this.isConnected = true;
+    await this.flushPendingCallEvents();
 
     const restoredIncomingCall = await this.nativeCallUi.getActiveIncomingCall();
     if (restoredIncomingCall && !this.activeCall) {
@@ -449,6 +455,40 @@ export class WebRTCCallController {
       to: peerId,
       payload,
     }));
+  }
+
+  private async flushPendingCallEvents() {
+    let pendingEvents: PendingCallEndedEvent[];
+    try {
+      pendingEvents = getPendingCallEvents();
+    } catch {
+      return;
+    }
+
+    for (const event of pendingEvents) {
+      if (
+        !event.eventId ||
+        !event.serverCallId ||
+        !event.peerId ||
+        event.peerId === this.identity.uid
+      ) {
+        acknowledgePendingCallEvents([event.eventId]);
+        continue;
+      }
+
+      try {
+        await this.sendEvent(
+          event.serverCallId,
+          event.peerId,
+          'call:reject',
+          { kind: 'empty' },
+        );
+        acknowledgePendingCallEvents([event.eventId]);
+      } catch {
+        // Keep the event queued for the next authenticated connection.
+        return;
+      }
+    }
   }
 
   private async finishActiveCall(

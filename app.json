@@ -62,7 +62,8 @@
           "incomingCallTimeout": 45,
           "outgoingCallTimeout": 60,
           "fulfillAnswerCallTimeout": 30,
-          "microphonePermission": "Callnet needs your microphone to make calls."
+          "microphonePermission": "Callnet needs your microphone to make calls.",
+          "androidEventReceiver": "com.orbitratech.callnet.CallEventReceiver"
         }
       ],
       [

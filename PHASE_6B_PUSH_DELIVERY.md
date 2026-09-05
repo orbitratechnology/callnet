@@ -12,6 +12,8 @@ Status: implemented in source; credentials, deployment, native rebuild, and devi
 - [x] Added payload and no-credential unit coverage.
 - [x] Declared the Firebase service-account secrets in Wrangler as required deployment inputs.
 - [x] Set an explicit iOS bundle identifier to keep the APNs topic stable.
+- [x] Added an Android `CallEventReceiver` for system call declines while JavaScript is unavailable.
+- [x] Persisted only bounded terminal-call metadata and flush it as an authenticated reject when Callnet JavaScript resumes.
 
 ## Operator setup before deployment
 
@@ -32,4 +34,6 @@ The APNs values are optional for an Android-only deployment, but iOS background 
 - [x] Verified `https://callnet-signaling.orbitra-technology.workers.dev/health` returned `status: ok`.
 - [ ] Rebuild the development client after dependencies/config changes.
 - [ ] Verify foreground, background, locked-device, answer, reject, timeout, and end behavior on both platforms.
-- [ ] Add the Android killed-app receiver and its authenticated terminal-event handoff before claiming killed-app decline propagation.
+- [ ] Confirm killed-app decline propagation on a physical Android device after rebuilding the development client.
+
+The receiver intentionally does not send an unauthenticated request while the app is killed. Remote rejection is flushed after Firebase Auth restores and the authenticated WebSocket reconnects. This keeps the Worker contract secure while preserving the event for the next app resume.

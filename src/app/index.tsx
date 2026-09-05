@@ -62,7 +62,7 @@ function WebRTCFooter({ error }: { error: string | null }) {
       <View style={styles.privacyNote}>
         <ThemedText variant="caption" tone="brand">AUTHENTICATED WEBRTC MODE</ThemedText>
         <ThemedText variant="subhead" tone="secondary" selectable>
-          Calls use your Firebase identity and a secure Socket.IO signaling connection.
+          Calls use your Firebase identity and a secure WebSocket signaling connection.
         </ThemedText>
         {error ? <ThemedText variant="caption" tone="destructive">{error}</ThemedText> : null}
       </View>
