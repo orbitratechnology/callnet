@@ -1,16 +1,18 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router/stack';
-import { StyleSheet, useColorScheme, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
-import { CallProvider } from '@/features/calls/call-provider';
+import { Colors, useThemeBackground } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/features/auth/auth-provider';
 import { AuthScreen } from '@/features/auth/auth-screen';
+import { CallProvider } from '@/features/calls/call-provider';
+import { AppThemeProvider } from '@/features/theme/theme-provider';
 
 function LoadingScreen() {
+  const backgroundColor = useThemeBackground();
+
   return (
-    <View style={styles.loadingScreen}>
+    <View style={[styles.loadingScreen, { backgroundColor }]}>
       <ThemedText variant="title">Callnet</ThemedText>
       <ThemedText variant="body" tone="secondary">Restoring your secure session…</ThemedText>
     </View>
@@ -18,17 +20,20 @@ function LoadingScreen() {
 }
 
 function CallStack() {
+  const backgroundColor = useThemeBackground();
+
   return (
     <CallProvider>
       <Stack
         screenOptions={{
-          contentStyle: { backgroundColor: Colors.systemBackground },
+          contentStyle: { backgroundColor },
           headerBackButtonDisplayMode: 'minimal',
           headerShadowVisible: false,
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Callnet', headerLargeTitle: true }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+        <Stack.Screen name="contact/[personId]" options={{ title: 'Contact' }} />
         <Stack.Screen name="select-person" options={{ title: 'Start a call', presentation: 'formSheet' }} />
         <Stack.Screen name="incoming" options={{ title: 'Incoming Call', headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen name="call" options={{ title: 'Call', headerShown: false, presentation: 'fullScreenModal' }} />
@@ -50,14 +55,12 @@ function RootContent() {
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <AppThemeProvider>
       <AuthProvider>
         <RootContent />
       </AuthProvider>
-    </ThemeProvider>
+    </AppThemeProvider>
   );
 }
 

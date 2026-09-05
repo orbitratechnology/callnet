@@ -5,22 +5,22 @@ export const Colors = {
   label: Platform.select({
     ios: Color.ios.label,
     android: Color.android.dynamic.onSurface,
-    default: '#12211F',
+    default: '#000000',
   })!,
   secondaryLabel: Platform.select({
     ios: Color.ios.secondaryLabel,
     android: Color.android.dynamic.onSurfaceVariant,
-    default: '#61716D',
+    default: '#666666',
   })!,
   separator: Platform.select({
     ios: Color.ios.separator,
     android: Color.android.dynamic.outlineVariant,
-    default: '#D9E2DF',
+    default: '#D6D6D6',
   })!,
   systemBackground: Platform.select({
-    ios: Color.ios.systemBackground,
-    android: Color.android.dynamic.surface,
-    default: '#F8FBFA',
+    ios: '#000000',
+    android: '#000000',
+    default: '#FFFFFF',
   })!,
   secondaryBackground: Platform.select({
     ios: Color.ios.secondarySystemBackground,
@@ -32,30 +32,34 @@ export const Colors = {
     android: Color.android.dynamic.error,
     default: '#C7362F',
   })!,
-  onBrand: '#FFFFFF',
+  success: '#46A982',
 } as const;
 
 export const BrandColors = {
-  light: { accent: '#197A6E', accentSoft: '#DDF3EE', accentContrast: '#0F403A' },
-  dark: { accent: '#61C8B6', accentSoft: '#173F39', accentContrast: '#E8FFFA' },
+  light: { accent: '#000000', accentSoft: '#F1F1F1', accentContrast: '#000000', onAccent: '#FFFFFF' },
+  dark: { accent: '#FFFFFF', accentSoft: '#2A2A2A', accentContrast: '#FFFFFF', onAccent: '#000000' },
 } as const;
 
 export const CallColors = {
-  background: '#07100E',
-  surface: 'rgba(17, 31, 28, 0.86)',
-  surfaceStrong: 'rgba(23, 42, 38, 0.96)',
-  border: 'rgba(232, 255, 250, 0.18)',
-  onSurface: '#F3FFFA',
-  onSurfaceSecondary: '#B9C8C3',
-  onSurfaceMuted: '#83938E',
-  controlBackground: '#F3FFFA',
-  controlForeground: '#10211E',
+  background: '#000000',
+  surface: 'rgba(24, 24, 24, 0.9)',
+  surfaceStrong: 'rgba(32, 32, 32, 0.96)',
+  border: 'rgba(255, 255, 255, 0.18)',
+  onSurface: '#FFFFFF',
+  onSurfaceSecondary: '#B8B8B8',
+  onSurfaceMuted: '#858585',
+  controlBackground: '#FFFFFF',
+  controlForeground: '#000000',
   endCall: '#E5544F',
 } as const;
 
 export function useBrandColors() {
   const scheme = useColorScheme();
   return BrandColors[scheme === 'dark' ? 'dark' : 'light'];
+}
+
+export function useThemeBackground() {
+  return useColorScheme() === 'dark' ? '#000000' : Colors.systemBackground;
 }
 
 export const Fonts = Platform.select({

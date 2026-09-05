@@ -30,7 +30,7 @@ The current implementation and remaining production gates are tracked in [RELEAS
 
 ## Authenticated calling flow
 
-Create or sign in to a real Firebase email/password or Google account on each device. Email accounts choose a username; Google accounts receive a readable handle derived from the Google name or account email. Find the other person by exact username, then start a voice or video call. No development identity is accepted by the authenticated signaling server.
+Create or sign in to a real Firebase email/password or Google account on each device. Email accounts choose a username; Google accounts receive a readable handle derived from the Google name or account email. On Calls, use the global search to find a person by name, `@username`, email, or phone number, then start a voice or video call directly from the result. No development identity is accepted by the authenticated signaling server.
 
 Native Google sign-in uses the registered Firebase Android/iOS apps and the web OAuth client ID. The first native run requires a fresh development build after the Google Sign-In package/config plugin is added.
 

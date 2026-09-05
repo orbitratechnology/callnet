@@ -5,11 +5,11 @@ import { FlatList, StyleSheet, TextInput, View } from 'react-native';
 import { PersonRow } from '@/components/person-row';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { Colors, Radius, Spacing, useThemeBackground } from '@/constants/theme';
+import { useAuth } from '@/features/auth/auth-provider';
 import { useCall } from '@/features/calls/call-provider';
 import type { DemoPerson } from '@/features/contacts/demo-people';
 import { findUserProfileByUsername, type UserProfile } from '@/features/profile/profile-service';
-import { useAuth } from '@/features/auth/auth-provider';
-import { Colors, Radius, Spacing } from '@/constants/theme';
 
 function matchesPerson(person: DemoPerson, query: string) {
   const normalizedQuery = query.trim().toLowerCase();
@@ -33,6 +33,7 @@ function PersonListHeader({
   resultCount: number;
   onQueryChange: (value: string) => void;
 }) {
+  const backgroundColor = useThemeBackground();
   const hasQuery = query.trim().length > 0;
   const helperText =
     count === 0
@@ -52,7 +53,7 @@ function PersonListHeader({
           onChangeText={onQueryChange}
           placeholder="Search name or @username"
           placeholderTextColor={Colors.secondaryLabel}
-          style={styles.input}
+          style={[styles.input, { backgroundColor }]}
           autoCapitalize="none"
           autoCorrect={false}
           clearButtonMode="while-editing"
@@ -77,6 +78,7 @@ function getInitials(name: string) {
 }
 
 function AddContactForm({ onAdd, ownerUid }: { onAdd: (contact: Omit<DemoPerson, 'id'>) => void; ownerUid: string }) {
+  const backgroundColor = useThemeBackground();
   const [username, setUsername] = useState('');
   const [result, setResult] = useState<UserProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -118,7 +120,7 @@ function AddContactForm({ onAdd, ownerUid }: { onAdd: (contact: Omit<DemoPerson,
       handle: `@${result.username}`,
       initials: getInitials(result.displayName),
       photoURL: result.photoURL,
-      accent: '#54C2A4',
+      accent: '#000000',
       identityId: result.uid,
     });
     setUsername('');
@@ -136,7 +138,7 @@ function AddContactForm({ onAdd, ownerUid }: { onAdd: (contact: Omit<DemoPerson,
         onChangeText={setUsername}
         placeholder="Username"
         placeholderTextColor={Colors.secondaryLabel}
-        style={styles.input}
+        style={[styles.input, { backgroundColor }]}
         autoCapitalize="none"
         autoCorrect={false}
       />
@@ -161,6 +163,7 @@ function AddContactForm({ onAdd, ownerUid }: { onAdd: (contact: Omit<DemoPerson,
 export default function SelectPersonScreen() {
   const { contacts, addContact } = useCall();
   const { user } = useAuth();
+  const backgroundColor = useThemeBackground();
   const [query, setQuery] = useState('');
   const visibleContacts = useMemo(
     () => contacts.filter((person) => matchesPerson(person, query)),
@@ -174,7 +177,7 @@ export default function SelectPersonScreen() {
         data={visibleContacts}
         keyExtractor={(person) => person.id}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { backgroundColor }]}
         ItemSeparatorComponent={PersonSeparator}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"

@@ -78,5 +78,24 @@ service cloud.firestore {
         getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == username;
       allow update, delete: if false;
     }
+
+    match /userSearch/{userId} {
+      // Search tokens are SHA-256 digests and are only queried by the
+      // authenticated Worker. The mobile client may maintain its own index
+      // document but cannot read or list the directory.
+      allow get, list: if false;
+      allow create, update: if isOwner(userId) &&
+        request.resource.data.keys().hasOnly(['uid', 'displayName', 'username', 'photoURL', 'searchTokens']) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() >= 1 &&
+        request.resource.data.displayName.size() <= 80 &&
+        request.resource.data.username is string &&
+        isValidUsername(request.resource.data.username) &&
+        (request.resource.data.photoURL == null || (request.resource.data.photoURL is string && request.resource.data.photoURL.size() <= 2048)) &&
+        request.resource.data.searchTokens is list &&
+        request.resource.data.searchTokens.size() <= 300;
+      allow delete: if false;
+    }
   }
 }

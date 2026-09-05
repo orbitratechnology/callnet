@@ -11,9 +11,16 @@ import { GoogleSignInButton } from 'react-native-nitro-google-signin';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { Colors, MaxContentWidth, Radius, Shadows, Spacing, useBrandColors } from '@/constants/theme';
+import {
+  Colors,
+  MaxContentWidth,
+  Radius,
+  Shadows,
+  Spacing,
+  useBrandColors,
+  useThemeBackground,
+} from '@/constants/theme';
 import { isValidUsername, normalizeUsername } from '@/features/profile/profile-service';
-import { strings } from '@/localization/strings';
 
 import { useAuth } from './auth-provider';
 import { getAuthErrorMessage } from './auth-service';
@@ -30,6 +37,7 @@ function BrandMark() {
 export function AuthScreen() {
   const { signInWithGoogle, signInWithEmail, createEmailAccount } = useAuth();
   const colorScheme = useColorScheme();
+  const backgroundColor = useThemeBackground();
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
@@ -41,15 +49,15 @@ export function AuthScreen() {
 
   const submit = async () => {
     if (!email.trim() || !password) {
-      setError(strings.auth.errors.emailPassword);
+      setError('Enter your email and password.');
       return;
     }
     if (isCreateMode && !displayName.trim()) {
-      setError(strings.auth.errors.displayName);
+      setError('Enter a display name.');
       return;
     }
     if (isCreateMode && !isValidUsername(normalizeUsername(username))) {
-      setError(strings.auth.errors.username);
+      setError('Choose a username with 3–30 letters, numbers, dots, dashes, or underscores.');
       return;
     }
 
@@ -87,7 +95,7 @@ export function AuthScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.screen}
+      style={[styles.screen, { backgroundColor }]}
       behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
@@ -100,10 +108,12 @@ export function AuthScreen() {
             <BrandMark />
             <View style={styles.intro}>
               <ThemedText variant="largeTitle">
-                {isCreateMode ? strings.auth.createTitle : strings.auth.signInTitle}
+                {isCreateMode ? 'Create your Callnet account' : 'Welcome to Callnet'}
               </ThemedText>
               <ThemedText variant="body" tone="secondary" selectable>
-                {isCreateMode ? strings.auth.createCopy : strings.auth.signInCopy}
+                {isCreateMode
+                  ? 'Choose a simple identity so people can find you and call you.'
+                  : 'Private calls with the people you know, across your devices.'}
               </ThemedText>
             </View>
           </View>
@@ -111,7 +121,7 @@ export function AuthScreen() {
           <View style={styles.formCard}>
             {process.env.EXPO_OS === 'web' ? (
               <Button
-                title={strings.auth.google}
+                title="Continue with Google"
                 variant="secondary"
                 size="lg"
                 loading={isGoogleSubmitting}
@@ -126,27 +136,27 @@ export function AuthScreen() {
                 contentAlignment="center"
                 loading={isGoogleSubmitting}
                 disabled={isSubmitting}
-                accessibilityLabel={strings.auth.google}
+                accessibilityLabel="Continue with Google"
                 style={styles.googleButton}
                 onPress={() => void signInGoogle()}
               />
             )}
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
-              <ThemedText variant="caption" tone="secondary">{strings.auth.emailDivider}</ThemedText>
+              <ThemedText variant="caption" tone="secondary">OR USE EMAIL</ThemedText>
               <View style={styles.dividerLine} />
             </View>
 
             {isCreateMode ? (
               <View style={styles.field}>
-                <ThemedText variant="caption" tone="secondary">{strings.auth.displayNameLabel}</ThemedText>
+                <ThemedText variant="caption" tone="secondary">Display name</ThemedText>
                 <TextInput
                   value={displayName}
                   onChangeText={setDisplayName}
-                  placeholder={strings.auth.displayNamePlaceholder}
+                  placeholder="How people will see you"
                   placeholderTextColor={Colors.secondaryLabel}
-                  style={styles.input}
-                  accessibilityLabel={strings.auth.displayNameLabel}
+                  style={[styles.input, { backgroundColor }]}
+                  accessibilityLabel="Display name"
                   autoCapitalize="words"
                   returnKeyType="next"
                 />
@@ -154,31 +164,31 @@ export function AuthScreen() {
             ) : null}
             {isCreateMode ? (
               <View style={styles.field}>
-                <ThemedText variant="caption" tone="secondary">{strings.auth.usernameLabel}</ThemedText>
+                <ThemedText variant="caption" tone="secondary">Callnet username</ThemedText>
                 <TextInput
                   value={username}
                   onChangeText={setUsername}
-                  placeholder={strings.auth.usernamePlaceholder}
+                  placeholder="your.handle"
                   placeholderTextColor={Colors.secondaryLabel}
-                  style={styles.input}
-                  accessibilityLabel={strings.auth.usernameLabel}
+                  style={[styles.input, { backgroundColor }]}
+                  accessibilityLabel="Callnet username"
                   autoCapitalize="none"
                   autoCorrect={false}
                   textContentType="username"
                   returnKeyType="next"
                 />
-                <ThemedText variant="caption" tone="secondary">{strings.auth.usernameHint}</ThemedText>
+                <ThemedText variant="caption" tone="secondary">3–30 characters: letters, numbers, dots, dashes, or underscores.</ThemedText>
               </View>
             ) : null}
             <View style={styles.field}>
-              <ThemedText variant="caption" tone="secondary">{strings.auth.emailLabel}</ThemedText>
+              <ThemedText variant="caption" tone="secondary">Email</ThemedText>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
-                placeholder={strings.auth.emailPlaceholder}
+                placeholder="you@example.com"
                 placeholderTextColor={Colors.secondaryLabel}
-                style={styles.input}
-                accessibilityLabel={strings.auth.emailLabel}
+                style={[styles.input, { backgroundColor }]}
+                accessibilityLabel="Email"
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
@@ -187,14 +197,14 @@ export function AuthScreen() {
               />
             </View>
             <View style={styles.field}>
-              <ThemedText variant="caption" tone="secondary">{strings.auth.passwordLabel}</ThemedText>
+              <ThemedText variant="caption" tone="secondary">Password</ThemedText>
               <TextInput
                 value={password}
                 onChangeText={setPassword}
-                placeholder={isCreateMode ? strings.auth.passwordPlaceholderCreate : strings.auth.passwordPlaceholderSignIn}
+                placeholder={isCreateMode ? 'At least 6 characters' : 'Your password'}
                 placeholderTextColor={Colors.secondaryLabel}
-                style={styles.input}
-                accessibilityLabel={strings.auth.passwordLabel}
+                style={[styles.input, { backgroundColor }]}
+                accessibilityLabel="Password"
                 secureTextEntry
                 textContentType={isCreateMode ? 'newPassword' : 'password'}
                 returnKeyType="done"
@@ -204,20 +214,20 @@ export function AuthScreen() {
 
             {error ? (
               <View style={styles.errorBox} accessible accessibilityRole="alert">
-                <ThemedText variant="caption" tone="destructive">{strings.auth.errorTitle}</ThemedText>
+                <ThemedText variant="caption" tone="destructive">Couldn’t continue</ThemedText>
                 <ThemedText variant="subhead" tone="destructive" selectable>{error}</ThemedText>
               </View>
             ) : null}
 
             <Button
-              title={isCreateMode ? strings.auth.createAccount : strings.auth.signIn}
+              title={isCreateMode ? 'Create account' : 'Sign in'}
               size="lg"
               loading={isSubmitting}
               disabled={isGoogleSubmitting}
               onPress={() => void submit()}
             />
             <Button
-              title={isCreateMode ? strings.auth.switchToSignIn : strings.auth.switchToCreate}
+              title={isCreateMode ? 'I already have an account' : 'Create a new account'}
               variant="ghost"
               disabled={isSubmitting || isGoogleSubmitting}
               onPress={toggleMode}
@@ -225,8 +235,8 @@ export function AuthScreen() {
           </View>
 
           <View style={styles.privacyNote}>
-            <ThemedText variant="caption" tone="brand">{strings.auth.privateByDesign}</ThemedText>
-            <ThemedText variant="subhead" tone="secondary" selectable>{strings.auth.privacyCopy}</ThemedText>
+            <ThemedText variant="caption" tone="brand">PRIVATE BY DESIGN</ThemedText>
+            <ThemedText variant="subhead" tone="secondary" selectable>No recordings. No public profile directory. Just focused calls.</ThemedText>
           </View>
         </View>
       </ScrollView>

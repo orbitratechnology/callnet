@@ -5,6 +5,7 @@ import {
   serverTimestamp,
   type DocumentData,
 } from 'firebase/firestore';
+import { digestStringAsync, CryptoDigestAlgorithm } from 'expo-crypto';
 
 import type { AuthUser } from '../auth/auth-service';
 import { firebaseDb } from '../auth/firebase-app';
@@ -17,6 +18,10 @@ export type UserProfile = {
   createdAt?: unknown;
   updatedAt?: unknown;
 };
+
+const DIRECTORY_SEARCH_MIN_LENGTH = 2;
+const DIRECTORY_SEARCH_MAX_LENGTH = 120;
+const DIRECTORY_SEARCH_PATH = '/directory/search';
 
 const USERNAME_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{1,28}[a-z0-9])?$/;
 
@@ -34,6 +39,47 @@ function fallbackUsername(uid: string) {
 
 function getDisplayName(user: Pick<AuthUser, 'displayName' | 'email'>) {
   return user.displayName?.trim() || user.email?.split('@')[0]?.trim() || 'user';
+}
+
+export function normalizePhoneNumber(value: string) {
+  return value.trim().replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
+}
+
+export function normalizeDirectorySearchValue(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed.startsWith('@')) {
+    return trimmed.slice(1);
+  }
+  if (trimmed.startsWith('+') || /^[\d\s().-]+$/.test(trimmed)) {
+    return normalizePhoneNumber(trimmed);
+  }
+  return trimmed.replace(/\s+/g, ' ');
+}
+
+function getPrefixValues(value: string) {
+  const normalized = normalizeDirectorySearchValue(value);
+  if (normalized.length < DIRECTORY_SEARCH_MIN_LENGTH) {
+    return [];
+  }
+
+  const values = new Set<string>();
+  for (let length = DIRECTORY_SEARCH_MIN_LENGTH; length <= normalized.length; length += 1) {
+    values.add(normalized.slice(0, length));
+  }
+
+  normalized.split(' ').forEach((word) => {
+    for (let length = DIRECTORY_SEARCH_MIN_LENGTH; length <= word.length; length += 1) {
+      values.add(word.slice(0, length));
+    }
+  });
+
+  return [...values];
+}
+
+async function createDirectorySearchTokens(values: string[]) {
+  const normalizedValues = [...new Set(values.map(normalizeDirectorySearchValue))]
+    .filter((value) => value.length >= DIRECTORY_SEARCH_MIN_LENGTH && value.length <= DIRECTORY_SEARCH_MAX_LENGTH);
+  return Promise.all(normalizedValues.map((value) => digestStringAsync(CryptoDigestAlgorithm.SHA256, value)));
 }
 
 function toUsernameSeed(value: string) {
@@ -128,6 +174,13 @@ export async function ensureUserProfile(user: AuthUser, preferredUsername?: stri
 
     const displayName = getDisplayName(user);
     const photoURL = user.photoURL ?? null;
+    const searchValues = [
+      ...getPrefixValues(displayName),
+      ...getPrefixValues(username),
+      ...(user.email ? [user.email] : []),
+      ...(user.phoneNumber ? [user.phoneNumber] : []),
+    ];
+    const searchTokens = await createDirectorySearchTokens(searchValues);
 
     if (!currentProfile) {
       transaction.set(userRef, {
@@ -155,6 +208,14 @@ export async function ensureUserProfile(user: AuthUser, preferredUsername?: stri
       const usernameRef = doc(firebaseDb, 'usernames', username);
       transaction.set(usernameRef, { uid: user.uid });
     }
+
+    transaction.set(doc(firebaseDb, 'userSearch', user.uid), {
+      uid: user.uid,
+      displayName,
+      username,
+      photoURL,
+      searchTokens,
+    });
 
     return {
       uid: user.uid,
@@ -184,4 +245,42 @@ export async function findUserProfileByUsername(value: string) {
 
   const profileSnapshot = await getDoc(doc(firebaseDb, 'users', uid));
   return profileSnapshot.exists() ? profileFromData(profileSnapshot.data()) : null;
+}
+
+export async function searchUserProfiles(value: string, idToken: string) {
+  const query = value.trim();
+  if (query.length < DIRECTORY_SEARCH_MIN_LENGTH || query.length > DIRECTORY_SEARCH_MAX_LENGTH) {
+    return [];
+  }
+
+  const configuredUrl = process.env.EXPO_PUBLIC_SIGNALING_URL?.trim();
+  if (!configuredUrl) {
+    throw new Error('Callnet search is not configured.');
+  }
+
+  const url = new URL(configuredUrl);
+  url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:';
+  url.pathname = DIRECTORY_SEARCH_PATH;
+  url.search = '';
+  url.searchParams.set('q', query);
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Callnet search failed with status ${response.status}.`);
+  }
+
+  const payload: unknown = await response.json();
+  if (!payload || typeof payload !== 'object' || !Array.isArray((payload as { results?: unknown }).results)) {
+    throw new Error('Callnet search returned an invalid response.');
+  }
+
+  return (payload as { results: unknown[] }).results.flatMap((result) => {
+    if (!result || typeof result !== 'object') {
+      return [];
+    }
+    const profile = profileFromData(result as DocumentData);
+    return profile ? [profile] : [];
+  });
 }

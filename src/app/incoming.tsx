@@ -6,11 +6,11 @@ import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { useCall } from '@/features/calls/call-provider';
-import { Colors, Radius, Spacing } from '@/constants/theme';
-import { strings } from '@/localization/strings';
+import { Colors, Radius, Spacing, useThemeBackground } from '@/constants/theme';
 
 export default function IncomingCallScreen() {
   const { session, acceptIncoming, reject } = useCall();
+  const backgroundColor = useThemeBackground();
   const isIncoming = session?.direction === 'incoming' && session.state === 'ringing';
   const [isAnswering, setIsAnswering] = useState(false);
 
@@ -30,15 +30,15 @@ export default function IncomingCallScreen() {
 
   if (!isIncoming || !session) {
     return (
-      <View style={styles.container}>
-        <Stack.Screen options={{ title: strings.incoming.screenTitle, headerShown: false }} />
+      <View style={[styles.container, { backgroundColor }]}>
+        <Stack.Screen options={{ title: 'Incoming Call', headerShown: false }} />
         <View style={styles.identity}>
-          <ThemedText variant="title" style={styles.centered}>{strings.incoming.unavailableTitle}</ThemedText>
+          <ThemedText variant="title" style={styles.centered}>No incoming call</ThemedText>
           <ThemedText variant="body" tone="secondary" style={styles.centered}>
-            {strings.incoming.unavailableCopy}
+            This call is no longer available.
           </ThemedText>
         </View>
-        <Button title={strings.call.back} variant="ghost" onPress={() => router.back()} />
+        <Button title="Back" variant="ghost" onPress={() => router.back()} />
       </View>
     );
   }
@@ -65,10 +65,10 @@ export default function IncomingCallScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Stack.Screen options={{ title: strings.incoming.screenTitle, headerShown: false }} />
+    <View style={[styles.container, { backgroundColor }]}>
+      <Stack.Screen options={{ title: 'Incoming Call', headerShown: false }} />
       <View style={styles.topBar}>
-        <ThemedText variant="caption" tone="secondary">{strings.incoming.label(callType)}</ThemedText>
+        <ThemedText variant="caption" tone="secondary">{`INCOMING ${callType.toUpperCase()} CALL`}</ThemedText>
       </View>
 
       <View style={styles.identity}>
@@ -78,13 +78,13 @@ export default function IncomingCallScreen() {
           {session.person.handle}
         </ThemedText>
         <ThemedText variant="headline" tone="brand" style={styles.centered}>
-          {strings.incoming.callingNow}
+          Calling you now
         </ThemedText>
       </View>
 
       <View style={styles.actions}>
-        <Button title={strings.incoming.answer(callType)} loading={isAnswering} onPress={() => void answer()} />
-        <Button title={strings.incoming.decline} variant="destructive" disabled={isAnswering} onPress={decline} />
+        <Button title={`Answer ${callType.toLowerCase()} call`} loading={isAnswering} onPress={() => void answer()} />
+        <Button title="Decline" variant="destructive" disabled={isAnswering} onPress={decline} />
       </View>
     </View>
   );

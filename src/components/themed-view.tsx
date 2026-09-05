@@ -1,7 +1,8 @@
 import { View, type ViewProps } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { useThemeBackground } from '@/constants/theme';
 
 export function ThemedView({ style, ...otherProps }: ViewProps) {
-  return <View style={[{ backgroundColor: Colors.systemBackground }, style]} {...otherProps} />;
+  const backgroundColor = useThemeBackground();
+  return <View style={[{ backgroundColor }, style]} {...otherProps} />;
 }

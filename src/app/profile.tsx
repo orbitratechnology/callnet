@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Colors, MaxContentWidth, Radius, Shadows, Spacing } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-provider';
 import { getUserProfile, type UserProfile } from '@/features/profile/profile-service';
-import { strings } from '@/localization/strings';
+import { useAppTheme } from '@/features/theme/theme-provider';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
+  const { mode, toggleMode } = useAppTheme();
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
@@ -19,12 +20,12 @@ export default function ProfileScreen() {
     void getUserProfile(user.uid).then(setProfile).catch(() => setProfile(null));
   }, [user?.uid]);
 
-  const displayName = profile?.displayName ?? user?.displayName ?? strings.profile.accountFallback;
+  const displayName = profile?.displayName ?? user?.displayName ?? 'Callnet account';
   const photoURL = profile?.photoURL ?? user?.photoURL;
 
   return (
     <>
-      <Stack.Screen options={{ title: strings.profile.screenTitle, headerLargeTitle: true }} />
+      <Stack.Screen options={{ title: 'Profile', headerLargeTitle: true }} />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
@@ -38,30 +39,57 @@ export default function ProfileScreen() {
                 <ThemedText variant="body" tone="brand">@{profile.username}</ThemedText>
               ) : null}
               <ThemedText variant="subhead" tone="secondary" selectable>
-                {user?.email ?? strings.profile.emailUnavailable}
+                {user?.email ?? 'Email not available'}
               </ThemedText>
             </View>
           </View>
 
           <ThemedText variant="body" tone="secondary" selectable>
-            {strings.profile.identityCopy}
+            Your account identifies you securely across devices.
           </ThemedText>
           <ThemedText variant="caption" tone="secondary">
-            {strings.profile.usernameHint}
+            Share your @username so people can find you securely.
           </ThemedText>
 
           <View style={styles.section}>
-            <ThemedText variant="caption" tone="brand">{strings.profile.privacyLabel}</ThemedText>
-            <ThemedText variant="headline">{strings.profile.privacyHeading}</ThemedText>
+            <ThemedText variant="caption" tone="brand">APPEARANCE</ThemedText>
+            <Pressable
+              accessibilityRole="switch"
+              accessibilityLabel="Dark theme"
+              accessibilityHint="Toggle dark theme"
+              accessibilityState={{ checked: mode === 'dark' }}
+              onPress={toggleMode}
+              style={({ pressed }) => [styles.themeRow, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <View style={styles.themeCopy}>
+                <ThemedText variant="headline">Dark theme</ThemedText>
+                <ThemedText variant="subhead" tone="secondary">
+                  {mode === 'dark' ? 'On' : 'Off'}
+                </ThemedText>
+              </View>
+              <Switch
+                value={mode === 'dark'}
+                accessible={false}
+                pointerEvents="none"
+                trackColor={{ false: '#D4D4D4', true: '#FFFFFF' }}
+                thumbColor={mode === 'dark' ? '#000000' : '#FFFFFF'}
+                ios_backgroundColor="#D4D4D4"
+              />
+            </Pressable>
+          </View>
+
+          <View style={styles.section}>
+            <ThemedText variant="caption" tone="brand">PRIVACY</ThemedText>
+            <ThemedText variant="headline">Clear, limited data handling</ThemedText>
             <View style={styles.privacyList}>
-              <PrivacyRow title={strings.profile.privacy.media} description={strings.profile.privacy.mediaCopy} />
-              <PrivacyRow title={strings.profile.privacy.connections} description={strings.profile.privacy.connectionsCopy} />
-              <PrivacyRow title={strings.profile.privacy.history} description={strings.profile.privacy.historyCopy} />
-              <PrivacyRow title={strings.profile.privacy.permissions} description={strings.profile.privacy.permissionsCopy} />
+              <PrivacyRow title="Media" description="Calls use WebRTC. Callnet does not record audio or video." />
+              <PrivacyRow title="Connections" description="Direct connections are preferred. TURN may relay encrypted media when needed." />
+              <PrivacyRow title="Call history" description="Detailed recent-call history is kept locally on this device." />
+              <PrivacyRow title="Permissions" description="Microphone and camera access are requested only when a call needs them." />
             </View>
           </View>
 
-          <Button title={strings.profile.signOut} variant="ghost" onPress={() => void signOut()} />
+          <Button title="Sign out" variant="ghost" onPress={() => void signOut()} />
         </View>
       </ScrollView>
     </>
@@ -90,6 +118,18 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingTop: Spacing.sm,
   },
+  themeRow: {
+    minHeight: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.secondaryBackground,
+    boxShadow: Shadows.card,
+  },
+  themeCopy: { flex: 1, gap: Spacing.xs },
   privacyList: {
     overflow: 'hidden',
     borderRadius: Radius.md,
@@ -116,7 +156,7 @@ function getInitials(name: string) {
 }
 
 function PrivacyRow({ title, description }: { title: string; description: string }) {
-  const isLast = title === strings.profile.privacy.permissions;
+  const isLast = title === 'Permissions';
   return (
     <View style={[styles.privacyRow, isLast ? styles.lastPrivacyRow : null]}>
       <ThemedText variant="headline">{title}</ThemedText>

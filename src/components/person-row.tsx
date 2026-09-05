@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
@@ -10,9 +10,10 @@ export type PersonRowProps = {
   photoURL?: string | null;
   detail?: string;
   onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
 };
 
-export function PersonRow({ name, initials, photoURL, detail, onPress }: PersonRowProps) {
+export function PersonRow({ name, initials, photoURL, detail, onPress, style }: PersonRowProps) {
   const accessibleDetail = detail?.replace(/\n/g, ', ');
 
   return (
@@ -20,7 +21,7 @@ export function PersonRow({ name, initials, photoURL, detail, onPress }: PersonR
       accessibilityRole="button"
       accessibilityLabel={accessibleDetail ? `${name}, ${accessibleDetail}` : name}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, { opacity: pressed ? 0.72 : 1 }]}
+      style={({ pressed }) => [styles.row, style, { opacity: pressed ? 0.72 : 1 }]}
     >
       <Avatar initials={initials} photoURL={photoURL} size="sm" />
       <View style={styles.copy}>

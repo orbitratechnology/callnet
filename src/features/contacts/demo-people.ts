@@ -4,6 +4,8 @@ export type DemoPerson = {
   handle: string;
   initials: string;
   photoURL?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
   accent: string;
   identityId: string;
 };
@@ -14,7 +16,7 @@ export const demoPeople: DemoPerson[] = [
     name: 'Maya Chen',
     handle: '@mayac',
     initials: 'MC',
-    accent: '#9B8AFB',
+    accent: '#000000',
     identityId: 'demo-maya',
   },
   {
@@ -22,7 +24,7 @@ export const demoPeople: DemoPerson[] = [
     name: 'Noah Williams',
     handle: '@noahw',
     initials: 'NW',
-    accent: '#F2A65A',
+    accent: '#000000',
     identityId: 'demo-noah',
   },
   {
@@ -30,7 +32,7 @@ export const demoPeople: DemoPerson[] = [
     name: 'Sofia Patel',
     handle: '@sofiap',
     initials: 'SP',
-    accent: '#54C2A4',
+    accent: '#000000',
     identityId: 'demo-sofia',
   },
 ];
@@ -62,7 +64,7 @@ export function createContactFromIdentity(
     handle: `@${username}`,
     initials,
     photoURL,
-    accent: '#54C2A4',
+    accent: '#000000',
     identityId,
   };
 }

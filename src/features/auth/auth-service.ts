@@ -24,6 +24,7 @@ let nativeGoogleConfigured = false;
 export type AuthUser = {
   uid: string;
   email: string | null;
+  phoneNumber: string | null;
   displayName: string | null;
   photoURL: string | null;
 };
@@ -46,6 +47,7 @@ function mapUser(user: FirebaseUser | null): AuthUser | null {
   return {
     uid: user.uid,
     email: user.email,
+    phoneNumber: user.phoneNumber,
     displayName: user.displayName,
     photoURL: user.photoURL,
   };

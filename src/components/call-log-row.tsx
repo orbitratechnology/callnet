@@ -4,8 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Radius, Spacing, useBrandColors } from '@/constants/theme';
-import { strings } from '@/localization/strings';
+import { Colors, Spacing, useBrandColors, useThemeBackground } from '@/constants/theme';
 import type { RecentCall } from '@/features/recents/recent-call-repository';
 
 export type CallLogRowProps = {
@@ -16,17 +15,17 @@ export type CallLogRowProps = {
 };
 
 function getStatusLabel(call: RecentCall) {
-  if (call.outcome === 'completed') return strings.home.callStatuses.completed;
-  if (call.outcome === 'missed') return strings.home.callStatuses.missed;
-  if (call.outcome === 'timed-out') return strings.home.callStatuses.timedOut;
-  if (call.outcome === 'rejected') return strings.home.callStatuses.rejected;
-  if (call.outcome === 'cancelled') return strings.home.callStatuses.cancelled;
-  if (call.outcome === 'failed') return strings.home.callStatuses.failed;
-  return call.direction === 'incoming' ? strings.home.callStatuses.incoming : strings.home.callStatuses.outgoing;
+  if (call.outcome === 'completed') return 'Completed call';
+  if (call.outcome === 'missed') return 'Missed call';
+  if (call.outcome === 'timed-out') return 'Timed out call';
+  if (call.outcome === 'rejected') return 'Declined call';
+  if (call.outcome === 'cancelled') return 'Cancelled call';
+  if (call.outcome === 'failed') return 'Failed call';
+  return call.direction === 'incoming' ? 'Incoming call' : 'Outgoing call';
 }
 
 function getCallTypeLabel(call: RecentCall) {
-  return call.kind === 'video' ? strings.home.callTypes.video : strings.home.callTypes.voice;
+  return call.kind === 'video' ? 'Video' : 'Voice';
 }
 
 function getCallIcon(call: RecentCall): { ios: SFSymbol; android: AndroidSymbol } {
@@ -40,10 +39,13 @@ function getCallIcon(call: RecentCall): { ios: SFSymbol; android: AndroidSymbol 
 
 export const CallLogRow = memo(function CallLogRow({ call, dateLabel, timeLabel, onPress }: CallLogRowProps) {
   const brand = useBrandColors();
+  const backgroundColor = useThemeBackground();
   const statusLabel = getStatusLabel(call);
   const callTypeLabel = getCallTypeLabel(call);
   const icon = getCallIcon(call);
   const isAttention = call.outcome === 'missed' || call.outcome === 'failed';
+  const isSuccessful = call.outcome === 'completed';
+  const statusColor = isAttention ? Colors.destructive : isSuccessful ? Colors.success : brand.accent;
   const accessibleLabel = `${call.person.name}, ${statusLabel}, ${callTypeLabel}, ${timeLabel}`;
 
   return (
@@ -53,7 +55,7 @@ export const CallLogRow = memo(function CallLogRow({ call, dateLabel, timeLabel,
         accessibilityRole="button"
         accessibilityLabel={accessibleLabel}
         onPress={onPress}
-        style={({ pressed }) => [styles.row, { opacity: pressed ? 0.68 : 1 }]}
+        style={({ pressed }) => [styles.row, { backgroundColor, opacity: pressed ? 0.68 : 1 }]}
       >
         <Avatar
           initials={call.person.initials}
@@ -73,7 +75,7 @@ export const CallLogRow = memo(function CallLogRow({ call, dateLabel, timeLabel,
             <SymbolView
               name={{ ios: icon.ios, android: icon.android, web: icon.android }}
               size={16}
-              tintColor={isAttention ? Colors.destructive : brand.accent}
+              tintColor={statusColor}
               fallback={<ThemedText variant="caption" style={styles.iconFallback}>↗</ThemedText>}
             />
             <ThemedText variant="subhead" tone="secondary" numberOfLines={1}>
@@ -124,5 +126,6 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   attentionText: { color: Colors.destructive },
+  successText: { color: Colors.success },
   iconFallback: { color: Colors.secondaryLabel },
 });

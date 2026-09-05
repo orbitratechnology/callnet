@@ -247,6 +247,14 @@ async function getGoogleAccessToken(config: PushEnvironment): Promise<string> {
   }
 }
 
+export async function getFirebaseAccessToken(env: {
+  FIREBASE_PROJECT_ID: string;
+  FIREBASE_SERVICE_ACCOUNT_EMAIL?: string;
+  FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
+}) {
+  return getGoogleAccessToken(getPushEnvironment(env));
+}
+
 async function getDeviceTokens(config: PushEnvironment, uid: string, accessToken: string): Promise<DeviceToken[]> {
   const url = new URL(
     `https://firestore.googleapis.com/v1/projects/${encodePathSegment(config.firebaseProjectId)}/databases/(default)/documents/users/${encodePathSegment(uid)}/devices`,

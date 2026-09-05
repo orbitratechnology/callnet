@@ -17,10 +17,9 @@ import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { CallColors, Colors, Motion, Radius, Spacing } from '@/constants/theme';
+import { CallColors, Colors, Motion, Radius, Spacing, useThemeBackground } from '@/constants/theme';
 import { useCall } from '@/features/calls/call-provider';
 import type { CallKind, CallState } from '@/features/calls/call-state';
-import { strings } from '@/localization/strings';
 import { redactDiagnostic } from '../../shared/diagnostics';
 
 type RtcViewProps = {
@@ -96,12 +95,12 @@ function VideoSurface({
   }));
 
   const placeholderMessage = !RTCView
-    ? strings.call.video.developmentClientRequired
+    ? 'Video preview requires the WebRTC development client.'
     : remoteStreamUrl
       ? null
       : state === 'connecting'
-        ? strings.call.video.connecting
-        : strings.call.video.waiting;
+        ? 'Connecting video…'
+        : 'Waiting for video…';
 
   return (
     <View style={styles.videoStage} pointerEvents="none">
@@ -124,7 +123,7 @@ function VideoSurface({
           <RTCView streamURL={localStreamUrl} style={styles.videoFrame} objectFit="cover" mirror />
           <View style={styles.previewBadge}>
             <ThemedText variant="caption" style={styles.previewBadgeText}>
-              {strings.call.video.localPreview}
+              Your video preview
             </ThemedText>
           </View>
         </Animated.View>
@@ -134,14 +133,14 @@ function VideoSurface({
 }
 
 function getStateLabel(state: CallState, direction?: 'incoming' | 'outgoing') {
-  if (state === 'outgoing') return strings.call.states.outgoing;
-  if (state === 'ringing') return direction === 'incoming' ? strings.call.states.incoming : strings.call.states.ringing;
-  if (state === 'connecting') return strings.call.states.connecting;
-  if (state === 'connected') return strings.call.states.connected;
-  if (state === 'ending') return strings.call.states.ending;
-  if (state === 'failed') return strings.call.states.failed;
-  if (state === 'ended') return strings.call.states.ended;
-  return strings.call.states.ready;
+  if (state === 'outgoing') return 'Calling…';
+  if (state === 'ringing') return direction === 'incoming' ? 'Incoming call' : 'Ringing…';
+  if (state === 'connecting') return 'Connecting…';
+  if (state === 'connected') return 'Connected';
+  if (state === 'ending') return 'Ending call…';
+  if (state === 'failed') return 'Call failed';
+  if (state === 'ended') return 'Call ended';
+  return 'Ready to call';
 }
 
 function formatDuration(seconds: number) {
@@ -157,6 +156,7 @@ function isTerminal(state: CallState | undefined) {
 export default function CallScreen() {
   const { personId } = useLocalSearchParams<{ personId?: string }>();
   const insets = useSafeAreaInsets();
+  const backgroundColor = useThemeBackground();
   const {
     session,
     transportMode,
@@ -244,15 +244,15 @@ export default function CallScreen() {
 
   if (!selectedPerson) {
     return (
-      <View style={styles.emptyContainer}>
-        <Stack.Screen options={{ title: strings.call.screenTitle, headerShown: false }} />
+      <View style={[styles.emptyContainer, { backgroundColor }]}>
+        <Stack.Screen options={{ title: 'Call', headerShown: false }} />
         <View style={styles.emptyCopy}>
-          <ThemedText variant="title" style={styles.centered}>{strings.call.noPersonSelected}</ThemedText>
+          <ThemedText variant="title" style={styles.centered}>No person selected</ThemedText>
           <ThemedText variant="body" tone="secondary" style={styles.centered}>
-            {strings.call.chooseSomeone}
+            Choose someone before starting a call.
           </ThemedText>
         </View>
-        <Button title={strings.call.back} variant="ghost" onPress={() => router.back()} />
+        <Button title="Back" variant="ghost" onPress={() => router.back()} />
       </View>
     );
   }
@@ -285,7 +285,7 @@ export default function CallScreen() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: strings.call.screenTitle,
+          title: 'Call',
           headerShown: false,
           animation: 'fade',
           contentStyle: { backgroundColor: CallColors.background },
@@ -296,7 +296,7 @@ export default function CallScreen() {
         style={StyleSheet.absoluteFill}
         onPress={toggleControls}
         accessible={false}
-        accessibilityLabel={strings.call.controls.toggleControls}
+        accessibilityLabel="Show or hide call controls"
       >
         {isVideoCall ? (
           <VideoSurface
@@ -319,11 +319,11 @@ export default function CallScreen() {
         >
           <IconButton
             label="×"
-            accessibilityLabel={isActiveCall ? strings.call.endAndClose : strings.call.closeScreen}
+            accessibilityLabel={isActiveCall ? 'End and close call' : 'Close call screen'}
             style={styles.closeButton}
             onPress={closeScreen}
           />
-          <ThemedText variant="headline" style={styles.callOnSurfaceText}>{strings.call.appName}</ThemedText>
+          <ThemedText variant="headline" style={styles.callOnSurfaceText}>Callnet</ThemedText>
           <View style={styles.topBarSpacer} />
         </Animated.View>
 
@@ -344,7 +344,7 @@ export default function CallScreen() {
           </ThemedText>
           <ThemedText variant="body" style={[styles.centered, styles.callSecondaryText]}>
             {isBusyWithAnotherPerson
-              ? strings.call.alreadyCalling(session?.person.name ?? '')
+              ? `You are already calling ${session?.person.name ?? ''}.`
               : getStateLabel(currentState ?? 'idle', session?.direction)}
           </ThemedText>
           {currentState === 'connected' ? (
@@ -358,30 +358,30 @@ export default function CallScreen() {
           <View style={[styles.failureCopy, { top: contentTop + 156 }]}>
             <ThemedText variant="subhead" style={[styles.centered, styles.callSecondaryText]}>
               {peerBusy
-                ? strings.call.failures.peerBusy
-                : permissionDenied
-                  ? strings.call.failures.permissionDenied
-                  : transportMode === 'webrtc'
-                    ? strings.call.failures.authenticated
-                    : strings.call.failures.demo}
+              ? 'That person is already on another call.'
+              : permissionDenied
+                ? 'Microphone or camera permission was denied.'
+                : transportMode === 'webrtc'
+                    ? 'The authenticated call could not connect.'
+                    : 'The demo call could not connect'}
             </ThemedText>
             {permissionDenied ? (
               <>
                 <ThemedText variant="caption" style={[styles.centered, styles.callSecondaryText]}>
-                  {strings.call.failures.permissionHint}
+                  Allow access in device settings, then try the call again.
                 </ThemedText>
                 <Button
-                  title={strings.call.actions.openSettings}
+                  title="Open Settings"
                   variant="secondary"
                   size="sm"
-                  accessibilityHint={strings.call.actions.openSettingsHint}
+                  accessibilityHint="Opens Callnet's device permissions"
                   onPress={() => void Linking.openSettings().catch(() => undefined)}
                 />
               </>
             ) : null}
             {__DEV__ && diagnostic && !permissionDenied ? (
               <ThemedText variant="caption" style={[styles.centered, styles.callSecondaryText]}>
-                {strings.call.diagnostics(diagnostic)}
+                {`Diagnostic: ${diagnostic}`}
               </ThemedText>
             ) : null}
           </View>
@@ -401,50 +401,50 @@ export default function CallScreen() {
           pointerEvents={controlsVisible ? 'auto' : 'none'}
         >
           {isBusyWithAnotherPerson ? (
-            <Button title={strings.call.back} variant="ghost" onPress={() => router.back()} style={styles.wideAction} />
+            <Button title="Back" variant="ghost" onPress={() => router.back()} style={styles.wideAction} />
           ) : isIncoming ? (
             <View style={styles.actions}>
-              <Button title={strings.call.actions.accept} onPress={() => void acceptIncoming()} style={styles.wideAction} />
-              <Button title={strings.call.actions.reject} variant="destructive" onPress={reject} style={styles.wideAction} />
+              <Button title="Accept call" onPress={() => void acceptIncoming()} style={styles.wideAction} />
+              <Button title="Reject" variant="destructive" onPress={reject} style={styles.wideAction} />
             </View>
           ) : isTerminal(currentState) ? (
             <View style={styles.actions}>
-              <Button title={strings.call.done} variant="ghost" onPress={closeCall} style={styles.wideAction} />
+              <Button title="Done" variant="ghost" onPress={closeCall} style={styles.wideAction} />
             </View>
           ) : isReady ? (
             <View style={styles.actions}>
-              <Button title={strings.call.actions.voiceCall} onPress={() => startCall('voice')} style={styles.wideAction} />
-              <Button title={strings.call.actions.videoCall} variant="secondary" onPress={() => startCall('video')} style={styles.wideAction} />
-              <Button title={strings.call.back} variant="ghost" onPress={() => router.back()} style={styles.wideAction} />
+              <Button title="Voice call" onPress={() => startCall('voice')} style={styles.wideAction} />
+              <Button title="Video call" variant="secondary" onPress={() => startCall('video')} style={styles.wideAction} />
+              <Button title="Back" variant="ghost" onPress={() => router.back()} style={styles.wideAction} />
             </View>
           ) : (
             <View style={styles.actions}>
               {currentState === 'connected' ? (
                 <View style={styles.controlRow}>
                   <IconButton
-                    label={session?.isMuted ? strings.call.controls.unmute : strings.call.controls.mute}
-                    accessibilityLabel={session?.isMuted ? strings.call.controls.unmuteMicrophone : strings.call.controls.microphone}
+                    label={session?.isMuted ? 'Unmute' : 'Mute'}
+                    accessibilityLabel={session?.isMuted ? 'Unmute microphone' : 'Mute microphone'}
                     active={session?.isMuted}
                     style={[styles.callControlButton, session?.isMuted ? styles.callControlActive : null]}
                     icon={
                       <CallIcon
                         ios={session?.isMuted ? 'mic.slash.fill' : 'mic.fill'}
                         android={session?.isMuted ? 'mic_off' : 'mic'}
-                        fallback={session?.isMuted ? strings.call.controls.unmute : strings.call.controls.mute}
+                        fallback={session?.isMuted ? 'Unmute' : 'Mute'}
                       />
                     }
                     onPress={toggleMute}
                   />
                   <IconButton
-                    label={session?.isSpeakerEnabled ? strings.call.controls.earpiece : strings.call.controls.speaker}
-                    accessibilityLabel={session?.isSpeakerEnabled ? strings.call.controls.useEarpiece : strings.call.controls.useSpeaker}
+                    label={session?.isSpeakerEnabled ? 'Earpiece' : 'Speaker'}
+                    accessibilityLabel={session?.isSpeakerEnabled ? 'Use earpiece' : 'Use speaker'}
                     active={session?.isSpeakerEnabled}
                     style={[styles.callControlButton, session?.isSpeakerEnabled ? styles.callControlActive : null]}
                     icon={
                       <CallIcon
                         ios={session?.isSpeakerEnabled ? 'speaker.fill' : 'hifispeaker.fill'}
                         android={session?.isSpeakerEnabled ? 'volume_up' : 'volume_mute'}
-                        fallback={session?.isSpeakerEnabled ? strings.call.controls.speaker : strings.call.controls.earpiece}
+                        fallback={session?.isSpeakerEnabled ? 'Speaker' : 'Earpiece'}
                       />
                     }
                     onPress={toggleSpeaker}
@@ -452,24 +452,24 @@ export default function CallScreen() {
                   {session?.kind === 'video' ? (
                     <>
                       <IconButton
-                        label={session.isCameraEnabled ? strings.call.controls.camera : strings.call.controls.cameraOff}
-                        accessibilityLabel={session.isCameraEnabled ? strings.call.controls.turnCameraOff : strings.call.controls.turnCameraOn}
+                        label={session.isCameraEnabled ? 'Camera' : 'Camera off'}
+                        accessibilityLabel={session.isCameraEnabled ? 'Turn camera off' : 'Turn camera on'}
                         active={!session.isCameraEnabled}
                         style={[styles.callControlButton, !session.isCameraEnabled ? styles.callControlActive : null]}
                         icon={
                           <CallIcon
                             ios={session.isCameraEnabled ? 'camera.fill' : 'video.slash.fill'}
                             android={session.isCameraEnabled ? 'videocam' : 'videocam_off'}
-                            fallback={session.isCameraEnabled ? strings.call.controls.camera : strings.call.controls.cameraOff}
+                            fallback={session.isCameraEnabled ? 'Camera' : 'Camera off'}
                           />
                         }
                         onPress={toggleCamera}
                       />
                       <IconButton
-                        label={strings.call.controls.flip}
-                        accessibilityLabel={strings.call.controls.switchCamera}
+                        label="Flip"
+                        accessibilityLabel="Switch camera"
                         style={styles.callControlButton}
-                        icon={<CallIcon ios="arrow.triangle.2.circlepath.camera" android="cameraswitch" fallback={strings.call.controls.flip} />}
+                        icon={<CallIcon ios="arrow.triangle.2.circlepath.camera" android="cameraswitch" fallback="Flip" />}
                         onPress={switchCamera}
                       />
                     </>
@@ -479,18 +479,18 @@ export default function CallScreen() {
               {currentState === 'outgoing' || currentState === 'ringing' || currentState === 'connecting' ? (
                 <>
                   <Button
-                    title={currentState === 'ringing' ? strings.call.actions.cancelCall : strings.call.actions.cancel}
+                    title={currentState === 'ringing' ? 'Cancel call' : 'Cancel'}
                     variant="destructive"
                     onPress={cancel}
                     style={styles.endAction}
                   />
                   {currentState === 'ringing' ? (
-                    <Button title={strings.call.actions.simulateTimeout} variant="ghost" size="sm" onPress={timeout} />
+                    <Button title="Simulate timeout" variant="ghost" size="sm" onPress={timeout} />
                   ) : null}
                 </>
               ) : (
                 <Button
-                  title={strings.call.actions.end}
+                  title="End call"
                   variant="destructive"
                   onPress={end}
                   disabled={currentState === 'ending'}

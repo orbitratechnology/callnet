@@ -32,10 +32,10 @@ export function Button({
 }: ButtonProps) {
   const brand = useBrandColors();
   const palette = {
-    primary: { backgroundColor: brand.accent, color: Colors.onBrand },
+    primary: { backgroundColor: brand.accent, color: brand.onAccent },
     secondary: { backgroundColor: brand.accentSoft, color: brand.accentContrast },
     ghost: { backgroundColor: 'transparent', color: brand.accent },
-    destructive: { backgroundColor: Colors.destructive, color: Colors.onBrand },
+    destructive: { backgroundColor: Colors.destructive, color: brand.onAccent },
   }[variant];
 
   return (

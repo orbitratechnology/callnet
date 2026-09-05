@@ -4,6 +4,7 @@ import { getFirebaseTokenFromSubprotocolHeader, SIGNALING_SUBPROTOCOL } from './
 import { UserSession } from './user-session';
 import { fetchMeteredIceServers } from './turn-credentials';
 import { redactDiagnostic } from '../../shared/diagnostics';
+import { searchDirectory } from './directory';
 
 export { CallSession, UserSession };
 
@@ -45,6 +46,34 @@ export default {
           }),
         );
         return new Response('Unable to provide ICE servers.', {
+          status: 503,
+          headers: { 'Cache-Control': 'no-store' },
+        });
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/directory/search') {
+      const authorization = request.headers.get('Authorization');
+      const token = authorization?.startsWith('Bearer ')
+        ? authorization.slice('Bearer '.length).trim()
+        : '';
+      if (!token) {
+        return new Response('Unauthorized.', { status: 401, headers: { 'Cache-Control': 'no-store' } });
+      }
+
+      let uid: string;
+      try {
+        uid = await verifyFirebaseIdToken(token, env.FIREBASE_PROJECT_ID);
+      } catch {
+        return new Response('Unauthorized.', { status: 401, headers: { 'Cache-Control': 'no-store' } });
+      }
+
+      try {
+        const results = await searchDirectory(env, url.searchParams.get('q') ?? '', uid);
+        return Response.json({ results }, { headers: { 'Cache-Control': 'no-store' } });
+      } catch (error) {
+        console.warn(JSON.stringify({ event: 'directory_search_failed', reason: redactDiagnostic(error, 96) }));
+        return new Response('Directory search is unavailable.', {
           status: 503,
           headers: { 'Cache-Control': 'no-store' },
         });
