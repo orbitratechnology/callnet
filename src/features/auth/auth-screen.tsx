@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -79,19 +78,23 @@ export function AuthScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <View style={styles.intro}>
             <ThemedText variant="largeTitle">Callnet</ThemedText>
-            <ThemedText variant="title">Private calls, made simple.</ThemedText>
+            <ThemedText variant="title">
+              {isCreateMode ? 'Create your account.' : 'Private calls, made simple.'}
+            </ThemedText>
             <ThemedText variant="body" tone="secondary">
-              Sign in to call people you know from any of your devices.
+              {isCreateMode
+                ? 'Create a Callnet identity to call people you know from any of your devices.'
+                : 'Sign in to call people you know from any of your devices.'}
             </ThemedText>
           </View>
 
-          {Platform.OS === 'web' ? (
+          {process.env.EXPO_OS === 'web' ? (
             <Button
               title="Continue with Google"
               variant="secondary"
@@ -118,54 +121,74 @@ export function AuthScreen() {
           </ThemedText>
 
           {isCreateMode ? (
-            <TextInput
-              value={displayName}
-              onChangeText={setDisplayName}
-              placeholder="Display name"
-              placeholderTextColor={Colors.secondaryLabel}
-              style={styles.input}
-              autoCapitalize="words"
-              returnKeyType="next"
-            />
+            <View style={styles.field}>
+              <ThemedText variant="caption" tone="secondary">Display name</ThemedText>
+              <TextInput
+                value={displayName}
+                onChangeText={setDisplayName}
+                placeholder="How people will see you"
+                placeholderTextColor={Colors.secondaryLabel}
+                style={styles.input}
+                autoCapitalize="words"
+                returnKeyType="next"
+              />
+            </View>
           ) : null}
           {isCreateMode ? (
+            <View style={styles.field}>
+              <ThemedText variant="caption" tone="secondary">Callnet username</ThemedText>
+              <TextInput
+                value={username}
+                onChangeText={setUsername}
+                placeholder="your.handle"
+                placeholderTextColor={Colors.secondaryLabel}
+                style={styles.input}
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="username"
+                returnKeyType="next"
+              />
+              <ThemedText variant="caption" tone="secondary">
+                3–30 characters: letters, numbers, dots, dashes, or underscores.
+              </ThemedText>
+            </View>
+          ) : null}
+          <View style={styles.field}>
+            <ThemedText variant="caption" tone="secondary">Email</ThemedText>
             <TextInput
-              value={username}
-              onChangeText={setUsername}
-              placeholder="Username"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
               placeholderTextColor={Colors.secondaryLabel}
               style={styles.input}
               autoCapitalize="none"
               autoCorrect={false}
-              textContentType="username"
+              keyboardType="email-address"
+              textContentType="emailAddress"
               returnKeyType="next"
             />
-          ) : null}
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            placeholderTextColor={Colors.secondaryLabel}
-            style={styles.input}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            returnKeyType="next"
-          />
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            placeholderTextColor={Colors.secondaryLabel}
-            style={styles.input}
-            secureTextEntry
-            textContentType={isCreateMode ? 'newPassword' : 'password'}
-            returnKeyType="done"
-            onSubmitEditing={() => void submit()}
-          />
+          </View>
+          <View style={styles.field}>
+            <ThemedText variant="caption" tone="secondary">Password</ThemedText>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder={isCreateMode ? 'At least 6 characters' : 'Your password'}
+              placeholderTextColor={Colors.secondaryLabel}
+              style={styles.input}
+              secureTextEntry
+              textContentType={isCreateMode ? 'newPassword' : 'password'}
+              returnKeyType="done"
+              onSubmitEditing={() => void submit()}
+            />
+          </View>
 
-          {error ? <ThemedText variant="subhead" tone="destructive">{error}</ThemedText> : null}
+          {error ? (
+            <View style={styles.errorBox} accessible accessibilityRole="alert">
+              <ThemedText variant="caption" tone="destructive">Couldn’t continue</ThemedText>
+              <ThemedText variant="subhead" tone="destructive" selectable>{error}</ThemedText>
+            </View>
+          ) : null}
 
           <Button
             title={isCreateMode ? 'Create account' : 'Sign in'}
@@ -201,6 +224,15 @@ const styles = StyleSheet.create({
   intro: { gap: Spacing.sm, paddingBottom: Spacing.md },
   dividerLabel: { textAlign: 'center', paddingVertical: Spacing.xs },
   googleButton: { alignSelf: 'center' },
+  field: { gap: Spacing.xs },
+  errorBox: {
+    gap: Spacing.xs,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.secondaryBackground,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.destructive,
+  },
   input: {
     minHeight: 52,
     paddingHorizontal: Spacing.md,

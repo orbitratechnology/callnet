@@ -1,5 +1,5 @@
 import { router, Stack } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, TextInput, View } from 'react-native';
 
 import { PersonRow } from '@/components/person-row';
@@ -11,12 +11,57 @@ import { findUserProfileByUsername, type UserProfile } from '@/features/profile/
 import { useAuth } from '@/features/auth/auth-provider';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 
-function PersonListHeader({ count }: { count: number }) {
+function matchesPerson(person: DemoPerson, query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  return [person.name, person.handle, person.identityId].some((value) =>
+    value.toLowerCase().includes(normalizedQuery),
+  );
+}
+
+function PersonListHeader({
+  count,
+  query,
+  resultCount,
+  onQueryChange,
+}: {
+  count: number;
+  query: string;
+  resultCount: number;
+  onQueryChange: (value: string) => void;
+}) {
+  const hasQuery = query.trim().length > 0;
+  const helperText =
+    count === 0
+      ? 'Find someone using their Callnet username.'
+      : hasQuery
+        ? resultCount > 0
+          ? `${resultCount} ${resultCount === 1 ? 'contact' : 'contacts'} match your search.`
+          : 'No matching contacts.'
+        : 'Choose someone you know.';
+
   return (
     <View style={styles.header}>
-      <ThemedText variant="body" tone="secondary">
-        {count > 0 ? 'Choose someone you know.' : 'Find someone using their Callnet username.'}
-      </ThemedText>
+      <View style={styles.searchCard}>
+        <ThemedText variant="caption" tone="secondary">Contacts</ThemedText>
+        <TextInput
+          value={query}
+          onChangeText={onQueryChange}
+          placeholder="Search name or @username"
+          placeholderTextColor={Colors.secondaryLabel}
+          style={styles.input}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+          returnKeyType="search"
+          accessibilityLabel="Search contacts"
+          accessibilityRole="search"
+        />
+      </View>
+      <ThemedText variant="body" tone="secondary">{helperText}</ThemedText>
     </View>
   );
 }
@@ -116,17 +161,31 @@ function AddContactForm({ onAdd, ownerUid }: { onAdd: (contact: Omit<DemoPerson,
 export default function SelectPersonScreen() {
   const { contacts, addContact } = useCall();
   const { user } = useAuth();
+  const [query, setQuery] = useState('');
+  const visibleContacts = useMemo(
+    () => contacts.filter((person) => matchesPerson(person, query)),
+    [contacts, query],
+  );
 
   return (
     <>
       <Stack.Screen options={{ title: 'Start a call' }} />
       <FlatList
-        data={contacts}
+        data={visibleContacts}
         keyExtractor={(person) => person.id}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
         ItemSeparatorComponent={PersonSeparator}
-        ListHeaderComponent={<PersonListHeader count={contacts.length} />}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        ListHeaderComponent={
+          <PersonListHeader
+            count={contacts.length}
+            query={query}
+            resultCount={visibleContacts.length}
+            onQueryChange={setQuery}
+          />
+        }
         ListFooterComponent={<AddContactForm onAdd={addContact} ownerUid={user?.uid ?? ''} />}
         renderItem={({ item: person }) => (
           <PersonRow
@@ -149,6 +208,13 @@ function PersonSeparator() {
 const styles = StyleSheet.create({
   content: { padding: Spacing.lg },
   header: { paddingBottom: Spacing.lg },
+  searchCard: {
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.secondaryBackground,
+  },
   separator: { height: Spacing.sm },
   addCard: {
     gap: Spacing.sm,

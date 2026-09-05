@@ -12,8 +12,45 @@ import { Colors, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 
 function getRecentCallDetail(call: RecentCall) {
   const kind = call.kind === 'video' ? 'Video' : 'Voice';
-  const outcome = call.outcome === 'completed' ? 'Completed' : call.outcome;
-  return `${kind} · ${outcome}`;
+  const direction = call.direction === 'incoming' ? 'Incoming' : 'Outgoing';
+  const outcome =
+    call.outcome === 'completed'
+      ? 'Completed'
+      : call.outcome === 'timed-out'
+        ? 'Timed out'
+        : call.outcome === 'rejected'
+          ? 'Declined'
+          : call.outcome.charAt(0).toUpperCase() + call.outcome.slice(1);
+  const title = call.outcome === 'missed' ? `Missed · ${kind}` : `${direction} · ${kind}`;
+
+  return `${title}\n${formatRecentCallTimestamp(call.timestamp)} · ${outcome}`;
+}
+
+function formatRecentCallTimestamp(timestamp: number) {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (isToday) {
+    return `Today, ${time}`;
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    date.getFullYear() === yesterday.getFullYear() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getDate() === yesterday.getDate();
+
+  if (isYesterday) {
+    return `Yesterday, ${time}`;
+  }
+
+  return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
 function HomeHeader({ onStartCall, onProfile }: { onStartCall: () => void; onProfile: () => void }) {
@@ -56,26 +93,51 @@ function HomeFooter({ onIncomingCall }: { onIncomingCall: () => void }) {
   );
 }
 
-function WebRTCFooter({ error }: { error: string | null }) {
+function WebRTCFooter({
+  error,
+  status,
+  onRetry,
+}: {
+  error: string | null;
+  status: 'connecting' | 'connected' | 'offline';
+  onRetry: () => void;
+}) {
+  const statusLabel = status === 'connected' ? 'CONNECTED' : status === 'connecting' ? 'CONNECTING…' : 'OFFLINE';
+  const statusCopy = status === 'connected'
+    ? 'Calls use your Firebase identity and a secure WebSocket signaling connection.'
+    : status === 'connecting'
+      ? 'Connecting to the calling service. You can retry if this takes too long.'
+      : 'The calling service is unavailable. Check your connection and try again.';
+
   return (
     <View style={styles.footerContent}>
       <View style={styles.privacyNote}>
-        <ThemedText variant="caption" tone="brand">AUTHENTICATED WEBRTC MODE</ThemedText>
-        <ThemedText variant="subhead" tone="secondary" selectable>
-          Calls use your Firebase identity and a secure WebSocket signaling connection.
+        <ThemedText variant="caption" tone={status === 'connected' ? 'brand' : 'secondary'}>
+          AUTHENTICATED WEBRTC · {statusLabel}
         </ThemedText>
-        {error ? <ThemedText variant="caption" tone="destructive">{error}</ThemedText> : null}
+        <ThemedText variant="subhead" tone="secondary" selectable>{statusCopy}</ThemedText>
+        {__DEV__ && error ? <ThemedText variant="caption" tone="secondary" selectable>Diagnostic: {error}</ThemedText> : null}
+        {status !== 'connected' ? (
+          <Button
+            title="Retry connection"
+            variant="secondary"
+            size="sm"
+            loading={status === 'connecting'}
+            disabled={status === 'connecting'}
+            onPress={onRetry}
+          />
+        ) : null}
       </View>
     </View>
   );
 }
 
 export default function HomeScreen() {
-  const { recentCalls, simulateIncoming, transportMode, transportError } = useCall();
+  const { recentCalls, simulateIncoming, transportMode, transportStatus, transportError, retryConnection } = useCall();
 
   const startDemoIncomingCall = () => {
     simulateIncoming(demoPeople[0], 'voice');
-    router.push('/call');
+    router.push('/incoming');
   };
 
   return (
@@ -110,7 +172,7 @@ export default function HomeScreen() {
         ListFooterComponent={
           transportMode === 'demo'
             ? <HomeFooter onIncomingCall={startDemoIncomingCall} />
-            : <WebRTCFooter error={transportError} />
+            : <WebRTCFooter error={transportError} status={transportStatus} onRetry={() => void retryConnection()} />
         }
       />
     </>

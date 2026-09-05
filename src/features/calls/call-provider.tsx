@@ -53,7 +53,9 @@ type CallContextValue = CallController & {
   contacts: DemoPerson[];
   addContact(contact: ContactInput): void;
   transportMode: CallTransportMode;
+  transportStatus: 'connecting' | 'connected' | 'offline';
   transportError: string | null;
+  retryConnection(): Promise<void>;
   localStreamUrl: string | null;
   remoteStreamUrl: string | null;
   resetCall(): void;
@@ -86,7 +88,11 @@ export function CallProvider({
   recentCallRepository,
 }: CallProviderProps) {
   const { user, getIdToken } = useAuth();
+  const transportMode = getCallTransportMode();
   const [session, dispatch] = useReducer(callReducer, null);
+  const [transportStatus, setTransportStatus] = useState<'connecting' | 'connected' | 'offline'>(
+    transportMode === 'demo' ? 'connected' : 'connecting',
+  );
   const [transportError, setTransportError] = useState<string | null>(null);
   const [localStreamUrl, setLocalStreamUrl] = useState<string | null>(null);
   const [remoteStreamUrl, setRemoteStreamUrl] = useState<string | null>(null);
@@ -113,7 +119,6 @@ export function CallProvider({
   const mountedRef = useRef(false);
   const pendingIncomingRouteRef = useRef<string | null>(null);
   const realControllerRef = useRef<WebRTCCallController | null>(null);
-  const transportMode = getCallTransportMode();
 
   sessionRef.current = session;
 
@@ -257,7 +262,7 @@ export function CallProvider({
     }
 
     pendingIncomingRouteRef.current = null;
-    router.push({ pathname: '/call', params: { personId } });
+    router.push({ pathname: '/incoming', params: { personId } });
   }, [session?.callId, session?.direction, session?.state]);
 
   useEffect(() => {
@@ -265,6 +270,8 @@ export function CallProvider({
       return;
     }
 
+    setTransportStatus('connecting');
+    setTransportError(null);
     let cancelled = false;
     let controller: WebRTCCallController | null = null;
     let unsubscribe: () => void = () => undefined;
@@ -278,8 +285,14 @@ export function CallProvider({
         unsubscribe = controller.subscribe(handleRealEvent);
         return controller.connect();
       })
+      .then(() => {
+        if (!cancelled && mountedRef.current) {
+          setTransportStatus('connected');
+        }
+      })
       .catch((error: unknown) => {
         if (!cancelled && mountedRef.current) {
+          setTransportStatus('offline');
           setTransportError(error instanceof Error ? error.message : 'Signaling connection failed.');
         }
       });
@@ -290,6 +303,34 @@ export function CallProvider({
       void controller?.disconnect();
     };
   }, [transportMode, user?.uid]);
+
+  const retryConnection = async () => {
+    if (transportMode !== 'webrtc' || !user) {
+      return;
+    }
+
+    const currentSession = sessionRef.current;
+    if (currentSession && isActiveState(currentSession.state)) {
+      return;
+    }
+
+    setTransportStatus('connecting');
+    setTransportError(null);
+
+    try {
+      const controller = await getConnectedController();
+      await controller.disconnect();
+      await controller.connect();
+      if (mountedRef.current) {
+        setTransportStatus('connected');
+      }
+    } catch (error: unknown) {
+      if (mountedRef.current) {
+        setTransportStatus('offline');
+        setTransportError(error instanceof Error ? error.message : 'Signaling connection failed.');
+      }
+    }
+  };
 
   useEffect(() => {
     if (transportMode !== 'webrtc' || !user) {
@@ -566,7 +607,9 @@ export function CallProvider({
     contacts,
     addContact,
     transportMode,
+    transportStatus,
     transportError,
+    retryConnection,
     localStreamUrl,
     remoteStreamUrl,
     startOutgoing,

@@ -13,17 +13,19 @@ export type PersonRowProps = {
 };
 
 export function PersonRow({ name, initials, photoURL, detail, onPress }: PersonRowProps) {
+  const accessibleDetail = detail?.replace(/\n/g, ', ');
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={detail ? `${name}, ${detail}` : name}
+      accessibilityLabel={accessibleDetail ? `${name}, ${accessibleDetail}` : name}
       onPress={onPress}
       style={({ pressed }) => [styles.row, { opacity: pressed ? 0.72 : 1 }]}
     >
       <Avatar initials={initials} photoURL={photoURL} size="sm" />
       <View style={styles.copy}>
         <ThemedText variant="headline">{name}</ThemedText>
-        {detail ? <ThemedText variant="subhead" tone="secondary">{detail}</ThemedText> : null}
+        {detail ? <ThemedText variant="subhead" tone="secondary" numberOfLines={2}>{detail}</ThemedText> : null}
       </View>
       <ThemedText variant="headline" tone="secondary" accessibilityLabel="Open">›</ThemedText>
     </Pressable>

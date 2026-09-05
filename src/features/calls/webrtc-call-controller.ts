@@ -77,6 +77,7 @@ export class WebRTCCallController {
   private unsubscribeFromTransport: (() => void) | null = null;
   private unsubscribeFromNativeCallUi: (() => void) | null = null;
   private readonly finishingCallIds = new Set<string>();
+  private disconnectPromise: Promise<void> | null = null;
 
   constructor(options: WebRTCCallControllerOptions) {
     this.identity = options.identity;
@@ -279,12 +280,41 @@ export class WebRTCCallController {
   }
 
   async disconnect() {
+    if (this.disconnectPromise) {
+      return this.disconnectPromise;
+    }
+
+    const disconnectPromise = this.disconnectInternal();
+    this.disconnectPromise = disconnectPromise;
+    try {
+      await disconnectPromise;
+    } finally {
+      if (this.disconnectPromise === disconnectPromise) {
+        this.disconnectPromise = null;
+      }
+    }
+  }
+
+  private async disconnectInternal() {
     this.unsubscribeFromNativeCallUi?.();
     this.unsubscribeFromNativeCallUi = null;
     this.unsubscribeFromTransport?.();
     this.unsubscribeFromTransport = null;
     this.isConnected = false;
-    await this.cleanupMedia();
+
+    const call = this.activeCall;
+    if (call) {
+      this.finishingCallIds.add(call.callId);
+      try {
+        await this.nativeCallUi.end(call.callId).catch(() => undefined);
+      } finally {
+        await this.cleanupActiveCall();
+        this.finishingCallIds.delete(call.callId);
+      }
+    } else {
+      await this.cleanupMedia();
+    }
+
     await this.transport.disconnect();
   }
 
@@ -309,6 +339,9 @@ export class WebRTCCallController {
     }
 
     if (event.type === 'call:reject' || event.type === 'call:cancel' || event.type === 'call:end') {
+      if (this.finishingCallIds.has(this.activeCall.callId)) {
+        return;
+      }
       const callId = this.activeCall.callId;
       const failureReason = event.type === 'call:reject'
         ? 'rejected'
@@ -497,7 +530,7 @@ export class WebRTCCallController {
     skipNativeCallUi = false,
   ) {
     const call = this.activeCall;
-    if (!call) {
+    if (!call || this.finishingCallIds.has(call.callId)) {
       return;
     }
 

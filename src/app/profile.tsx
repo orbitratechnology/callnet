@@ -5,7 +5,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Avatar } from '@/components/avatar';
 import { Button } from '@/components/ui/button';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-provider';
 import { getUserProfile, type UserProfile } from '@/features/profile/profile-service';
 
@@ -42,6 +42,26 @@ export default function ProfileScreen() {
               Share your @username so people can find you securely.
             </ThemedText>
           </View>
+          <View style={styles.privacyCard}>
+            <ThemedText variant="caption" tone="brand">PRIVACY</ThemedText>
+            <ThemedText variant="headline">Clear, limited data handling</ThemedText>
+            <PrivacyRow
+              title="Media"
+              description="Calls use WebRTC. Callnet does not record audio or video."
+            />
+            <PrivacyRow
+              title="Connections"
+              description="Direct connections are preferred. TURN may relay encrypted media when needed."
+            />
+            <PrivacyRow
+              title="Call history"
+              description="Detailed recent-call history is kept locally on this device."
+            />
+            <PrivacyRow
+              title="Permissions"
+              description="Microphone and camera access are requested only when a call needs them."
+            />
+          </View>
           <View style={styles.divider} />
           <Button title="Sign out" variant="ghost" onPress={() => void signOut()} />
         </View>
@@ -53,7 +73,9 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: Spacing.lg },
   container: { gap: Spacing.lg },
-  accountCard: { gap: Spacing.sm, padding: Spacing.md, backgroundColor: Colors.secondaryBackground, borderRadius: 16 },
+  accountCard: { gap: Spacing.sm, padding: Spacing.md, backgroundColor: Colors.secondaryBackground, borderRadius: Radius.md },
+  privacyCard: { gap: Spacing.md, padding: Spacing.md, backgroundColor: Colors.secondaryBackground, borderRadius: Radius.md },
+  privacyRow: { gap: Spacing.xs },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.separator },
 });
 
@@ -65,4 +87,13 @@ function getInitials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('') || 'CN';
+}
+
+function PrivacyRow({ title, description }: { title: string; description: string }) {
+  return (
+    <View style={styles.privacyRow}>
+      <ThemedText variant="headline">{title}</ThemedText>
+      <ThemedText variant="subhead" tone="secondary" selectable>{description}</ThemedText>
+    </View>
+  );
 }

@@ -30,6 +30,7 @@ function CallStack() {
         <Stack.Screen name="index" options={{ title: 'Callnet', headerLargeTitle: true }} />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="select-person" options={{ title: 'Start a call', presentation: 'formSheet' }} />
+        <Stack.Screen name="incoming" options={{ title: 'Incoming Call', headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen name="call" options={{ title: 'Call', headerShown: false, presentation: 'fullScreenModal' }} />
       </Stack>
     </CallProvider>

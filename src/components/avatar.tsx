@@ -1,4 +1,5 @@
-import { Image, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+import { StyleSheet, View } from 'react-native';
 import { useEffect, useState } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
@@ -19,12 +20,18 @@ export function Avatar({ initials, photoURL, size = 'md' }: AvatarProps) {
   return (
     <View
       style={[styles.base, styles[size], { backgroundColor: brand.accentSoft }]}
+      accessible
+      accessibilityRole="image"
       accessibilityLabel={showImage ? 'Profile picture' : `${initials} avatar`}
     >
       {showImage ? (
         <Image
           source={{ uri: photoURL! }}
           style={styles.image}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={150}
+          accessible={false}
           accessibilityIgnoresInvertColors
           onError={() => setImageFailed(true)}
         />

@@ -1,6 +1,7 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 import { useEffect, useState, type ComponentType } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Linking, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
@@ -18,6 +19,17 @@ type RtcViewProps = {
 };
 
 type RtcViewModule = { RTCView?: ComponentType<RtcViewProps> };
+
+function CallIcon({ ios, android, fallback }: { ios: SFSymbol; android: AndroidSymbol; fallback: string }) {
+  return (
+    <SymbolView
+      name={{ ios, android, web: android }}
+      size={22}
+      tintColor={Colors.label}
+      fallback={<ThemedText variant="headline">{fallback}</ThemedText>}
+    />
+  );
+}
 
 declare const require: (moduleName: string) => unknown;
 
@@ -133,6 +145,7 @@ export default function CallScreen() {
   const isReady = !session || !isCurrentSession;
   const duration = session?.connectedAt ? Math.max(0, Math.floor((now - session.connectedAt) / 1000)) : 0;
   const failureReason = session?.failureReason;
+  const permissionDenied = currentState === 'failed' && failureReason?.includes('permission');
 
   const startCall = (kind: CallKind) => {
     void startOutgoing(selectedPerson, kind);
@@ -143,11 +156,26 @@ export default function CallScreen() {
     router.back();
   };
 
+  const closeScreen = () => {
+    if (currentState && !isTerminal(currentState) && currentState !== 'idle') {
+      if (currentState === 'outgoing' || currentState === 'ringing' || currentState === 'connecting') {
+        void cancel();
+      } else if (currentState === 'connected') {
+        void end();
+      }
+    }
+    router.back();
+  };
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Call', headerShown: false }} />
       <View style={styles.topBar}>
-        <IconButton label="×" accessibilityLabel="Close call screen" onPress={() => router.back()} />
+        <IconButton
+          label="×"
+          accessibilityLabel={currentState && !isTerminal(currentState) && currentState !== 'idle' ? 'End and close call' : 'Close call screen'}
+          onPress={closeScreen}
+        />
         <ThemedText variant="headline">Callnet</ThemedText>
         <View style={styles.topBarSpacer} />
       </View>
@@ -168,13 +196,27 @@ export default function CallScreen() {
         {currentState === 'failed' ? (
           <View style={styles.failureCopy}>
             <ThemedText variant="subhead" tone="secondary" style={styles.centered}>
-              {failureReason?.includes('permission')
+              {permissionDenied
               ? 'Microphone or camera permission was denied.'
               : transportMode === 'webrtc'
                 ? 'The authenticated call could not connect.'
                 : 'The demo call could not connect.'}
             </ThemedText>
-            {__DEV__ && failureReason && !failureReason.includes('permission') ? (
+            {permissionDenied ? (
+              <>
+                <ThemedText variant="caption" tone="secondary" style={styles.centered}>
+                  Allow access in device settings, then try the call again.
+                </ThemedText>
+                <Button
+                  title="Open Settings"
+                  variant="secondary"
+                  size="sm"
+                  accessibilityHint="Opens Callnet's device permissions"
+                  onPress={() => void Linking.openSettings().catch(() => undefined)}
+                />
+              </>
+            ) : null}
+            {__DEV__ && failureReason && !permissionDenied ? (
               <ThemedText variant="caption" tone="secondary" style={styles.centered}>
                 Diagnostic: {failureReason}
               </ThemedText>
@@ -216,11 +258,27 @@ export default function CallScreen() {
               <IconButton
                 label={session?.isMuted ? 'Unmute' : 'Mute'}
                 accessibilityLabel={session?.isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                active={session?.isMuted}
+                icon={
+                  <CallIcon
+                    ios={session?.isMuted ? 'mic.slash.fill' : 'mic.fill'}
+                    android={session?.isMuted ? 'mic_off' : 'mic'}
+                    fallback={session?.isMuted ? 'Muted' : 'Mic'}
+                  />
+                }
                 onPress={toggleMute}
               />
               <IconButton
                 label={session?.isSpeakerEnabled ? 'Earpiece' : 'Speaker'}
                 accessibilityLabel={session?.isSpeakerEnabled ? 'Use earpiece' : 'Use speaker'}
+                active={session?.isSpeakerEnabled}
+                icon={
+                  <CallIcon
+                    ios={session?.isSpeakerEnabled ? 'speaker.fill' : 'hifispeaker.fill'}
+                    android={session?.isSpeakerEnabled ? 'volume_up' : 'volume_mute'}
+                    fallback={session?.isSpeakerEnabled ? 'Speaker' : 'Earpiece'}
+                  />
+                }
                 onPress={toggleSpeaker}
               />
               {session?.kind === 'video' ? (
@@ -228,9 +286,22 @@ export default function CallScreen() {
                   <IconButton
                     label={session.isCameraEnabled ? 'Camera' : 'Camera off'}
                     accessibilityLabel={session.isCameraEnabled ? 'Turn camera off' : 'Turn camera on'}
+                    active={!session.isCameraEnabled}
+                    icon={
+                      <CallIcon
+                        ios={session.isCameraEnabled ? 'camera.fill' : 'video.slash.fill'}
+                        android={session.isCameraEnabled ? 'videocam' : 'videocam_off'}
+                        fallback={session.isCameraEnabled ? 'Camera' : 'Camera off'}
+                      />
+                    }
                     onPress={toggleCamera}
                   />
-                  <IconButton label="Flip" accessibilityLabel="Switch camera" onPress={switchCamera} />
+                  <IconButton
+                    label="Flip"
+                    accessibilityLabel="Switch camera"
+                    icon={<CallIcon ios="arrow.triangle.2.circlepath.camera" android="cameraswitch" fallback="Flip" />}
+                    onPress={switchCamera}
+                  />
                 </>
               ) : null}
             </View>
