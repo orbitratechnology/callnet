@@ -22,6 +22,28 @@ Callnet is an Expo SDK 57 one-to-one voice and video calling app. The app uses F
 
 The Expo scripts require the Doppler CLI and use its standard `doppler run -- <command>` injection pattern with `--preserve-env=false`. If a legacy `.env.local` exists, remove it because Expo will otherwise load it alongside the injected environment.
 
+### EAS environment and Google services sync
+
+EAS builds use the EAS environment-variable service. The `development`, `preview`, and `production` build profiles in [eas.json](eas.json) explicitly select the matching EAS environment. The app config reads these EAS file variables when present and falls back to the ignored local files for local development:
+
+- `GOOGLE_SERVICES_JSON` → Android `google-services.json`
+- `GOOGLE_SERVICE_INFO_PLIST` → iOS `GoogleService-Info.plist`
+
+Keep the two Google files locally at their ignored paths (`google-services.json` and `GoogleService-Info.plist`). The sync command uploads them directly to EAS as secret file variables; they do not need to be copied into Doppler. Then run the sync from the repository root:
+
+```powershell
+# Sync public EXPO_PUBLIC_* variables and both Google files to development
+bun run eas:sync-env -- -EasEnvironment development -DopplerConfig dev_personal
+
+# Sync production values, using the existing production Doppler config
+bun run eas:sync-env -- -EasEnvironment production -DopplerConfig prd
+
+# Upload only the two Google files
+bun run eas:sync-google-services -- -EasEnvironment preview -DopplerConfig dev_personal
+```
+
+The sync script uploads the local files as EAS secret file variables and removes its temporary public-env files when it exits. It never prints secret values. After syncing, EAS builds can run with the normal `eas build --profile <profile>` command; local Metro commands continue to use Doppler.
+
 The normal calling flow uses the deployed Worker configured in `EXPO_PUBLIC_SIGNALING_URL`. Deploy and operate it from [workers/](workers/), using Wrangler. The former Node/Socket.IO service has been removed. TURN configuration is requested from the authenticated Worker at `/ice-servers`; the mobile source and public configuration contain no Metered API key.
 
 Native incoming-call UI is provided by `expo-callkit-telecom` on iOS CallKit and Android Core-Telecom. It requires a development-client rebuild after dependency or config changes; see [docs/native-calls.md](docs/native-calls.md).

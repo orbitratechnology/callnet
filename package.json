@@ -52,6 +52,8 @@
     "prebuild": "doppler run --preserve-env=false -- bun x expo prebuild",
     "web": "doppler run --preserve-env=false -- bun x expo start --web",
     "lint": "doppler run --preserve-env=false -- bun x expo lint",
+    "eas:sync-env": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sync-eas-env.ps1",
+    "eas:sync-google-services": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sync-eas-env.ps1 -SkipPublicEnv",
     "worker:sync-secrets": "doppler run --project callnet --config prd --preserve-env=false -- powershell -NoProfile -ExecutionPolicy Bypass -File ./workers/scripts/sync-worker-secrets.ps1"
   },
   "private": true

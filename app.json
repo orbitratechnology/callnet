@@ -9,16 +9,15 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.orbitratech.callnet",
-      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "UIBackgroundModes": [
           "audio",
           "voip"
         ]
-      }
+      },
+      "bitcode": false
     },
     "android": {
-      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/callnet-icon.png"
@@ -29,7 +28,15 @@
         "MODIFY_AUDIO_SETTINGS",
         "BLUETOOTH_CONNECT",
         "MANAGE_OWN_CALLS",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
       ],
       "predictiveBackGestureEnabled": false,
       "package": "com.orbitratech.callnet"
@@ -83,6 +90,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1c857a88-1148-4220-ae84-73ae35f5c891"
+      }
+    },
+    "owner": "orbitratech"
   }
 }
