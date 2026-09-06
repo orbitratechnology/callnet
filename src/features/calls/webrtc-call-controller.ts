@@ -21,12 +21,7 @@ import {
 import type { SignalingTransport, SignalingTransportStatus } from './signaling-transport';
 import { WebSocketSignalingTransport } from './websocket-signaling';
 import { nativeCallUi, type NativeCallUi, type NativeCallUiEvent } from './native-call-ui';
-import {
-  acknowledgePendingCallEvents,
-  getPendingCallEvents,
-  type PendingCallEndedEvent,
-} from '../../../modules/callnet-background-events';
-
+import { getActiveCallSnapshots } from './call-config';
 export type RealCallControllerEvent =
   | { type: 'incoming'; callId: string; kind: CallKind; from: CallIdentityId; profile: CallProfile; timestamp: number }
   | { type: 'state'; callId: string; state: 'connecting' | 'connected' | 'ended' | 'failed'; failureReason?: string }
@@ -112,10 +107,15 @@ export class WebRTCCallController {
     }) ?? null;
     await this.transport.connect({ identity: this.identity, idToken: this.authToken });
     this.isConnected = true;
-    await this.flushPendingCallEvents();
-
+    const activeCallSnapshots = await getActiveCallSnapshots(this.authToken);
     const restoredIncomingCall = await this.nativeCallUi.getActiveIncomingCall();
-    if (restoredIncomingCall && !this.activeCall) {
+    if (
+      restoredIncomingCall &&
+      activeCallSnapshots &&
+      !activeCallSnapshots.some((call) => call.callId === restoredIncomingCall.serverCallId)
+    ) {
+      await this.nativeCallUi.end(restoredIncomingCall.serverCallId).catch(() => undefined);
+    } else if (restoredIncomingCall && !this.activeCall) {
       this.activeCall = {
         callId: restoredIncomingCall.serverCallId,
         peerId: restoredIncomingCall.peerId,
@@ -509,40 +509,6 @@ export class WebRTCCallController {
       to: peerId,
       payload,
     }));
-  }
-
-  private async flushPendingCallEvents() {
-    let pendingEvents: PendingCallEndedEvent[];
-    try {
-      pendingEvents = getPendingCallEvents();
-    } catch {
-      return;
-    }
-
-    for (const event of pendingEvents) {
-      if (
-        !event.eventId ||
-        !event.serverCallId ||
-        !event.peerId ||
-        event.peerId === this.identity.uid
-      ) {
-        acknowledgePendingCallEvents([event.eventId]);
-        continue;
-      }
-
-      try {
-        await this.sendEvent(
-          event.serverCallId,
-          event.peerId,
-          'call:reject',
-          { kind: 'empty' },
-        );
-        acknowledgePendingCallEvents([event.eventId]);
-      } catch {
-        // Keep the event queued for the next authenticated connection.
-        return;
-      }
-    }
   }
 
   private async finishActiveCall(

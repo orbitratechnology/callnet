@@ -1,3 +1,5 @@
+import type { ActiveCallSnapshot } from '../../../shared/call-protocol';
+
 export type CallTransportMode = 'demo' | 'webrtc';
 
 export function getCallTransportMode(): CallTransportMode {
@@ -37,6 +39,23 @@ function isIceServer(value: unknown): value is IceServerConfig {
     (candidate.credential === undefined || typeof candidate.credential === 'string');
 }
 
+function isActiveCallSnapshot(value: unknown): value is ActiveCallSnapshot {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const call = value as Partial<ActiveCallSnapshot>;
+  return Boolean(
+    typeof call.callId === 'string' && call.callId.length > 0 && call.callId.length <= 128 &&
+      typeof call.peerId === 'string' && call.peerId.length > 0 && call.peerId.length <= 128 &&
+      (call.kind === 'voice' || call.kind === 'video') &&
+      (call.direction === 'incoming' || call.direction === 'outgoing') &&
+      (call.state === 'ringing' || call.state === 'connected') &&
+      typeof call.createdAt === 'number' && Number.isFinite(call.createdAt) &&
+      typeof call.updatedAt === 'number' && Number.isFinite(call.updatedAt),
+  );
+}
+
 export async function getIceServers(idToken: string): Promise<IceServerConfig[]> {
   try {
     const response = await fetch(`${getSignalingHttpUrl()}/ice-servers`, {
@@ -58,5 +77,34 @@ export async function getIceServers(idToken: string): Promise<IceServerConfig[]>
     return servers;
   } catch {
     return fallbackIceServers;
+  }
+}
+
+export async function getActiveCallSnapshots(idToken: string): Promise<ActiveCallSnapshot[] | null> {
+  try {
+    const response = await fetch(`${getSignalingHttpUrl()}/calls/active`, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`active-calls-http-${response.status}`);
+    }
+
+    const value = (await response.json()) as unknown;
+    if (!value || typeof value !== 'object' || !Array.isArray((value as { calls?: unknown }).calls)) {
+      throw new Error('active-calls-invalid');
+    }
+
+    const calls = (value as { calls: unknown[] }).calls;
+    if (!calls.every(isActiveCallSnapshot)) {
+      throw new Error('active-calls-invalid');
+    }
+
+    return calls;
+  } catch {
+    return null;
   }
 }

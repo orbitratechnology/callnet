@@ -44,7 +44,7 @@ bun run eas:sync-google-services -- -EasEnvironment preview -DopplerConfig dev_p
 
 The sync script uploads the local files as EAS secret file variables and removes its temporary public-env files when it exits. It never prints secret values. After syncing, EAS builds can run with the normal `eas build --profile <profile>` command; local Metro commands continue to use Doppler.
 
-The normal calling flow uses the deployed Worker configured in `EXPO_PUBLIC_SIGNALING_URL`. Deploy and operate it from [workers/](workers/), using Wrangler. The former Node/Socket.IO service has been removed. TURN configuration is requested from the authenticated Worker at `/ice-servers`; the mobile source and public configuration contain no Metered API key.
+The normal calling flow uses the deployed Worker configured in `EXPO_PUBLIC_SIGNALING_URL`. Deploy and operate it from [workers/](workers/), using Wrangler; see [docs/cloudflare-signaling.md](docs/cloudflare-signaling.md) for the operator workflow. The former Node/Socket.IO service has been removed. TURN configuration is requested from the authenticated Worker at `/ice-servers`; the mobile source and public configuration contain no Metered API key.
 
 Native incoming-call UI is provided by `expo-callkit-telecom` on iOS CallKit and Android Core-Telecom. It requires a development-client rebuild after dependency or config changes; see [docs/native-calls.md](docs/native-calls.md).
 

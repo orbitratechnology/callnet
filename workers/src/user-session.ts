@@ -1,5 +1,10 @@
 import { DurableObject } from 'cloudflare:workers';
-import { isCallEvent, type CallEvent } from '../../shared/call-protocol';
+import {
+  isCallEvent,
+  type ActiveCallSnapshot,
+  type CallEvent,
+  type CallKind,
+} from '../../shared/call-protocol';
 import {
   isClientSignalingMessage,
   isServerSignalingMessage,
@@ -18,6 +23,8 @@ const MAX_EVENT_SKEW_MS = 5 * 60 * 1_000;
 type UserSessionAttachment = {
   uid: string;
 };
+
+type ActiveCallRow = ActiveCallSnapshot;
 
 type CallSessionResult = {
   ok: boolean;
@@ -67,10 +74,76 @@ export class UserSession extends DurableObject<Env> {
     this.ready = ctx.blockConcurrencyWhile(async () => {
       ctx.storage.sql.exec(
         `CREATE TABLE IF NOT EXISTS active_call (
-          call_id TEXT PRIMARY KEY
+          call_id TEXT PRIMARY KEY,
+          peer_id TEXT,
+          kind TEXT,
+          direction TEXT,
+          state TEXT,
+          created_at INTEGER,
+          updated_at INTEGER
         )`,
       );
+
+      const columns = new Set(
+        ctx.storage.sql
+          .exec<{ name: string }>('PRAGMA table_info(active_call)')
+          .toArray()
+          .map((column) => column.name),
+      );
+      if (!columns.has('peer_id')) {
+        ctx.storage.sql.exec('ALTER TABLE active_call ADD COLUMN peer_id TEXT');
+      }
+      if (!columns.has('kind')) {
+        ctx.storage.sql.exec('ALTER TABLE active_call ADD COLUMN kind TEXT');
+      }
+      if (!columns.has('direction')) {
+        ctx.storage.sql.exec('ALTER TABLE active_call ADD COLUMN direction TEXT');
+      }
+      if (!columns.has('state')) {
+        ctx.storage.sql.exec('ALTER TABLE active_call ADD COLUMN state TEXT');
+      }
+      if (!columns.has('created_at')) {
+        ctx.storage.sql.exec('ALTER TABLE active_call ADD COLUMN created_at INTEGER');
+      }
+      if (!columns.has('updated_at')) {
+        ctx.storage.sql.exec('ALTER TABLE active_call ADD COLUMN updated_at INTEGER');
+      }
     });
+  }
+
+  async getActiveCallSnapshots(): Promise<ActiveCallSnapshot[]> {
+    await this.ready;
+    return this.ctx.storage.sql
+      .exec<ActiveCallRow>(
+        `SELECT call_id AS callId,
+          peer_id AS peerId,
+          kind,
+          direction,
+          state,
+          created_at AS createdAt,
+          updated_at AS updatedAt
+        FROM active_call
+        WHERE peer_id IS NOT NULL
+          AND (kind = 'voice' OR kind = 'video')
+          AND (direction = 'incoming' OR direction = 'outgoing')
+          AND (state = 'ringing' OR state = 'connected')
+          AND created_at IS NOT NULL
+          AND updated_at IS NOT NULL`,
+      )
+      .toArray();
+  }
+
+  async rememberActiveCall(event: CallEvent, uid: string): Promise<void> {
+    await this.ready;
+    if (event.type !== 'call:invite' || event.to !== uid || event.payload.kind !== 'call') {
+      return;
+    }
+    this.rememberCall(event, uid);
+  }
+
+  async forgetActiveCall(callId: string): Promise<void> {
+    await this.ready;
+    this.forgetCall(callId);
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -154,7 +227,7 @@ export class UserSession extends DurableObject<Env> {
       if (isTerminalCallEvent(event) || result.code === 'already-ended') {
         this.forgetCall(event.callId);
       } else {
-        this.rememberCall(event.callId);
+        this.rememberCall(event, attachment.uid);
       }
     }
 
@@ -234,7 +307,7 @@ export class UserSession extends DurableObject<Env> {
         if (isTerminalCallEvent(value.event)) {
           this.forgetCall(value.event.callId);
         } else {
-          this.rememberCall(value.event.callId);
+          this.rememberCall(value.event, targetUid);
         }
         return Response.json({ delivered: true });
       } catch {
@@ -254,8 +327,43 @@ export class UserSession extends DurableObject<Env> {
     }
   }
 
-  private rememberCall(callId: string): void {
-    this.ctx.storage.sql.exec('INSERT OR IGNORE INTO active_call (call_id) VALUES (?)', callId);
+  private rememberCall(event: CallEvent, uid: string): void {
+    const peerId = event.from === uid ? event.to : event.from;
+    if (event.type === 'call:invite' && event.payload.kind === 'call') {
+      const direction = event.from === uid ? 'outgoing' : 'incoming';
+      const kind: CallKind = event.payload.callKind;
+      this.ctx.storage.sql.exec(
+        `INSERT OR REPLACE INTO active_call
+          (call_id, peer_id, kind, direction, state, created_at, updated_at)
+          VALUES (?, ?, ?, ?, 'ringing', ?, ?)`,
+        event.callId,
+        peerId,
+        kind,
+        direction,
+        event.timestamp,
+        event.timestamp,
+      );
+      return;
+    }
+
+    if (event.type === 'call:accept') {
+      this.ctx.storage.sql.exec(
+        `UPDATE active_call
+          SET state = 'connected', updated_at = ?
+          WHERE call_id = ? AND peer_id = ?`,
+        event.timestamp,
+        event.callId,
+        peerId,
+      );
+      return;
+    }
+
+    this.ctx.storage.sql.exec(
+      'UPDATE active_call SET updated_at = ? WHERE call_id = ? AND peer_id = ?',
+      event.timestamp,
+      event.callId,
+      peerId,
+    );
   }
 
   private hasOtherActiveCall(callId: string): boolean {

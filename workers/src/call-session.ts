@@ -216,6 +216,7 @@ export class CallSession extends DurableObject<Env> {
         timestamp,
         payload: { kind: 'empty', reason: 'timed-out' },
       }));
+      await this.clearUserSnapshots(session);
       deleteSession(this.ctx);
       await this.ctx.storage.deleteAlarm();
     });
@@ -271,6 +272,8 @@ export class CallSession extends DurableObject<Env> {
           return jsonResponse({ ok: false, code: 'peer-offline' }, 409);
         }
 
+        await this.env.USER_SESSION.getByName(event.to).rememberActiveCall(event, event.to);
+
         console.info(JSON.stringify({
           event: 'call_invite_push_delivered',
           callId: redactIdentifier(event.callId),
@@ -322,12 +325,11 @@ export class CallSession extends DurableObject<Env> {
         return jsonResponse({ ok: false, code: 'invalid-call-state' }, 409);
       }
 
-      if (!(await this.deliverEvent(event)).delivered) {
-        return jsonResponse({ ok: false, code: 'peer-offline' }, 409);
-      }
+      const delivery = await this.deliverEvent(event);
+      await this.clearUserSnapshots(existing);
       deleteSession(this.ctx);
       await this.ctx.storage.deleteAlarm();
-      return jsonResponse({ ok: true });
+      return jsonResponse({ ok: true, ...(delivery.delivered ? {} : { code: 'peer-offline' }) });
     }
 
     if (event.type === 'webrtc:offer' && event.from !== existing.callerId) {
@@ -367,6 +369,7 @@ export class CallSession extends DurableObject<Env> {
         to: peerId,
         payload: { kind: 'empty' },
       }));
+      await this.clearUserSnapshots(session);
       deleteSession(this.ctx);
       await this.ctx.storage.deleteAlarm();
       return jsonResponse({ ok: true });
@@ -401,5 +404,12 @@ export class CallSession extends DurableObject<Env> {
     } catch {
       return { delivered: false };
     }
+  }
+
+  private async clearUserSnapshots(session: PersistedCallSession): Promise<void> {
+    await Promise.all([
+      this.env.USER_SESSION.getByName(session.callerId).forgetActiveCall(session.callId),
+      this.env.USER_SESSION.getByName(session.calleeId).forgetActiveCall(session.callId),
+    ]);
   }
 }

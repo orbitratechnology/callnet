@@ -18,6 +18,37 @@ export default {
       );
     }
 
+    if (request.method === 'GET' && url.pathname === '/calls/active') {
+      const authorization = request.headers.get('Authorization');
+      const token = authorization?.startsWith('Bearer ')
+        ? authorization.slice('Bearer '.length).trim()
+        : '';
+      if (!token) {
+        return new Response('Unauthorized.', { status: 401, headers: { 'Cache-Control': 'no-store' } });
+      }
+
+      let uid: string;
+      try {
+        uid = await verifyFirebaseIdToken(token, env.FIREBASE_PROJECT_ID);
+      } catch {
+        return new Response('Unauthorized.', { status: 401, headers: { 'Cache-Control': 'no-store' } });
+      }
+
+      try {
+        const calls = await env.USER_SESSION.getByName(uid).getActiveCallSnapshots();
+        return Response.json(
+          { calls },
+          { headers: { 'Cache-Control': 'no-store' } },
+        );
+      } catch (error) {
+        console.warn(JSON.stringify({ event: 'active_calls_request_failed', reason: redactDiagnostic(error, 96) }));
+        return new Response('Unable to read active calls.', {
+          status: 503,
+          headers: { 'Cache-Control': 'no-store' },
+        });
+      }
+    }
+
     if (request.method === 'GET' && url.pathname === '/ice-servers') {
       const authorization = request.headers.get('Authorization');
       const token = authorization?.startsWith('Bearer ')

@@ -11,12 +11,12 @@ This gate must pass before Firebase Auth or Firestore work begins. It is a manua
 - [x] USB ADB reverse tunnels established for Metro `8081` and signaling `8787` on both targets.
 - [x] Home → person selection → call screen navigation verified.
 - [x] Real voice-call attempt reached the terminal failure state without crashing.
-- [ ] Signaling host is currently reachable: bounded check found no listener on `127.0.0.1:8787`.
+- [ ] Cloudflare Worker signaling endpoint is reachable: no authenticated Worker/device evidence was recorded for this skipped gate.
 - [x] Microphone permission prompt displayed and accepted.
 - [x] ARS L22 loaded Callnet through a direct reverse-tunneled Expo deep link.
-- [x] Runtime development identity selector added; ARS L22 was switched to `device-b` and the other client remained `device-a`.
-- [ ] T4.2.1 voice connection is blocked: cross-device calls produced no incoming event while signaling was unavailable.
-- [ ] Socket.IO loopback probe is passing: the bounded probe returned `device-a-connect-error=websocket error`.
+- [x] Historical development identity selector was used during the pre-auth phase; it is no longer part of the authenticated app flow.
+- [ ] T4.2.1 voice connection is verified through the authenticated Cloudflare Worker.
+- [ ] Native WebSocket probe against the deployed Worker is passing.
 - [ ] Two-device WebRTC QA is not passed.
 
 ## Task 4.1 — Provision the test environment
@@ -25,9 +25,9 @@ This gate must pass before Firebase Auth or Firestore work begins. It is a manua
 - [ ] Create a development client containing the native WebRTC packages.
 - [ ] Install one client configured as `device-a`.
 - [ ] Install a second client configured as `device-b`.
-- [ ] Run the development signaling service on the same LAN as both devices.
-- [ ] Set both clients to the signaling host's LAN URL, not `127.0.0.1`, when using physical devices.
-- [ ] For USB reverse mode, use `127.0.0.1` for Metro and signaling on both clients.
+- [ ] Use the deployed Cloudflare Worker URL, or a separately provisioned local Wrangler endpoint, for signaling.
+- [ ] Set both clients to the Worker URL; do not use `127.0.0.1` for signaling on physical devices unless a tunnel/reverse route is intentionally provisioned.
+- [ ] For USB reverse mode, use the separately configured Metro route only; the authenticated Worker remains the signaling endpoint.
 - [ ] Serve a separate Metro bundle for `device-a` on port `8081`.
 - [ ] Serve a separate Metro bundle for `device-b` on port `8082`.
 - [ ] Reverse Metro port `8082` to the second device and launch its `127.0.0.1:8082` deep link.
@@ -39,7 +39,7 @@ This gate must pass before Firebase Auth or Firestore work begins. It is a manua
 - [ ] Android: grant camera and microphone permissions when requested.
 - [ ] iOS: confirm the camera and microphone permission descriptions are visible and understandable.
 - [ ] Confirm the signaling port is reachable from both devices.
-- [ ] Confirm the two clients show different development identities.
+- [ ] Confirm the two clients are signed in with different Firebase accounts.
 - [ ] Record device model, OS version, app build identifier, signaling URL, and test date.
 
 ## Task 4.2 — Basic connection flows

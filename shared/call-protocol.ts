@@ -14,6 +14,16 @@ export type CallProfile = {
   photoURL: string | null;
 };
 
+export type ActiveCallSnapshot = {
+  callId: string;
+  peerId: CallIdentityId;
+  kind: CallKind;
+  direction: 'incoming' | 'outgoing';
+  state: 'ringing' | 'connected';
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type CallEventType =
   | 'call:invite'
   | 'call:accept'

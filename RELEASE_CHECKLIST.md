@@ -12,7 +12,7 @@ This checklist is the release boundary for the current Expo SDK 57 development-b
 - [x] Cloudflare Worker WebSocket signaling with Firebase token verification and Durable Objects.
 - [x] TURN credentials served by the authenticated Worker without exposing the Metered API key to the mobile app.
 - [x] `expo-callkit-telecom` adapter for native outgoing/incoming call surfaces.
-- [x] Android killed-app terminal event receiver and authenticated event flush on app resume.
+- [x] Authoritative active-call snapshots reconcile native call UI after app resume.
 - [x] Privacy explanation, accessible labels, 44-point icon targets, and reduced-motion handling for image transitions.
 - [x] Developer-only diagnostics redaction for URLs, bearer tokens, query secrets, and long secret-like values.
 

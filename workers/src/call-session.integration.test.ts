@@ -73,6 +73,32 @@ describe('CallSession Durable Object', () => {
     if (isServerSignalingMessage(value) && value.kind === 'call:event') {
       expect(value.event).toEqual(event);
     }
+
+    expect(await env.USER_SESSION.getByName(event.to).getActiveCallSnapshots()).toEqual([
+      {
+        callId: event.callId,
+        peerId: event.from,
+        kind: 'voice',
+        direction: 'incoming',
+        state: 'ringing',
+        createdAt: event.timestamp,
+        updatedAt: event.timestamp,
+      },
+    ]);
+
+    const end = createCallEvent({
+      type: 'call:end',
+      callId: event.callId,
+      from: event.from,
+      to: event.to,
+      payload: { kind: 'empty' },
+    });
+    const endMessage = nextMessage(socket);
+    expect(await (await env.CALL_SESSION.getByName(event.callId).fetch(
+      internalEventRequest(end, end.from),
+    )).json()).toEqual({ ok: true });
+    await endMessage;
+    expect(await env.USER_SESSION.getByName(event.to).getActiveCallSnapshots()).toEqual([]);
     socket.close(1000, 'test complete');
   });
 
