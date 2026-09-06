@@ -1,4 +1,4 @@
-package com.orbitratech.callnet
+package com.orbitratech.callnet.backgroundevents
 
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition

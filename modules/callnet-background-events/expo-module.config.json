@@ -2,7 +2,7 @@
   "platforms": ["android"],
   "android": {
     "modules": [
-      "com.orbitratech.callnet.CallnetBackgroundEventsModule"
+      "com.orbitratech.callnet.backgroundevents.CallnetBackgroundEventsModule"
     ]
   }
 }
