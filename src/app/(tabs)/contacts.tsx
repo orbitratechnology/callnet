@@ -127,7 +127,7 @@ export default function ContactsScreen() {
       name={item.name}
       initials={item.initials}
       photoURL={item.photoURL}
-      detail={item.handle}
+      detail={item.phoneNumber ?? 'Callnet contact'}
       onPress={() => router.push({ pathname: '/contact/[personId]', params: { personId: item.id } })}
       style={styles.contactRow}
     />

@@ -19,8 +19,6 @@ import {
   Spacing,
   useThemeBackground,
 } from '@/constants/theme';
-import { isValidUsername, normalizeUsername } from '@/features/profile/profile-service';
-
 import { useAuth } from './auth-provider';
 import { getAuthErrorMessage } from './auth-service';
 
@@ -29,7 +27,6 @@ export function AuthScreen() {
   const backgroundColor = useThemeBackground();
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [displayName, setDisplayName] = useState('');
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -45,16 +42,11 @@ export function AuthScreen() {
       setError('Enter a display name.');
       return;
     }
-    if (isCreateMode && !isValidUsername(normalizeUsername(username))) {
-      setError('Choose a username with 3–30 letters, numbers, dots, dashes, or underscores.');
-      return;
-    }
-
     setError(null);
     setIsSubmitting(true);
     try {
       if (isCreateMode) {
-        await createEmailAccount(email.trim(), password, displayName.trim(), normalizeUsername(username));
+        await createEmailAccount(email.trim(), password, displayName.trim());
       } else {
         await signInWithEmail(email.trim(), password);
       }
@@ -149,24 +141,6 @@ export function AuthScreen() {
                   autoCapitalize="words"
                   returnKeyType="next"
                 />
-              </View>
-            ) : null}
-            {isCreateMode ? (
-              <View style={styles.field}>
-                <ThemedText variant="caption" tone="secondary">Callnet username</ThemedText>
-                <TextInput
-                  value={username}
-                  onChangeText={setUsername}
-                  placeholder="your.handle"
-                  placeholderTextColor={Colors.secondaryLabel}
-                  style={[styles.input, { backgroundColor }]}
-                  accessibilityLabel="Callnet username"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  textContentType="username"
-                  returnKeyType="next"
-                />
-                <ThemedText variant="caption" tone="secondary">3–30 characters: letters, numbers, dots, dashes, or underscores.</ThemedText>
               </View>
             ) : null}
             <View style={styles.field}>

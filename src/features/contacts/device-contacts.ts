@@ -5,9 +5,8 @@ import {
   getPermissionsAsync,
   requestPermissionsAsync,
 } from 'expo-contacts';
-import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
 
-import { normalizePhoneNumber } from '@/features/profile/profile-service';
+import { hashPhoneNumber, normalizePhoneNumber } from '@/features/profile/profile-service';
 import type { ContactMatchRequest } from '@/features/profile/profile-service';
 
 export type DeviceContact = ContactMatchRequest & {
@@ -21,18 +20,6 @@ export type DeviceContactsPermission = {
   canAskAgain: boolean;
   accessPrivileges?: 'all' | 'limited' | 'none';
 };
-
-function normalizeEmail(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function identifierValue(value: string, kind: 'email' | 'phone') {
-  return kind === 'phone' ? normalizePhoneNumber(value) : normalizeEmail(value);
-}
-
-async function hashIdentifier(value: string) {
-  return digestStringAsync(CryptoDigestAlgorithm.SHA256, value);
-}
 
 function permissionResult(result: Awaited<ReturnType<typeof getPermissionsAsync>>): DeviceContactsPermission {
   return {
@@ -60,17 +47,14 @@ export async function readDeviceContacts(): Promise<DeviceContact[]> {
         const emails = contact.emails?.map((item) => item.address?.trim()).filter((value): value is string => Boolean(value)) ?? [];
         const phoneNumbers = contact.phones?.map((item) => item.number?.trim()).filter((value): value is string => Boolean(value)) ?? [];
         const email = emails[0] ?? null;
-        const phoneNumber = phoneNumbers[0] ?? null;
-        const identifiers = [
-          ...emails.map((value) => ({ value: identifierValue(value, 'email') })),
-          ...phoneNumbers.map((value) => ({ value: identifierValue(value, 'phone') })),
-        ].filter((item) => item.value.length > 0);
+        const normalizedPhoneNumbers = [...new Set(phoneNumbers.map((value) => normalizePhoneNumber(value)))].filter(Boolean);
 
-        if (identifiers.length === 0) {
+        if (normalizedPhoneNumbers.length === 0) {
           return null;
         }
 
-        const tokens = await Promise.all([...new Set(identifiers.map((item) => item.value))].map(hashIdentifier));
+        const tokens = await Promise.all(normalizedPhoneNumbers.map(hashPhoneNumber));
+        const phoneNumber = normalizedPhoneNumbers[0] ?? null;
         const deviceContact: DeviceContact = {
           contactId: contact.id,
           name: contact.fullName?.trim() || phoneNumber || email || 'Unnamed contact',

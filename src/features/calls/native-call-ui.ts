@@ -142,10 +142,6 @@ function loadNativeModule(): NativeCallKitModule | null {
   }
 }
 
-function isProfileUsername(value: string) {
-  return /^[a-z0-9](?:[a-z0-9._-]{1,28}[a-z0-9])?$/.test(value);
-}
-
 function getMetadataValue(metadata: Record<string, string> | undefined, key: string) {
   const value = metadata?.[key];
   return typeof value === 'string' && value.length > 0 ? value : undefined;
@@ -244,7 +240,8 @@ class NativeCallUiAdapter implements NativeCallUi {
       hasVideo: kind === 'video',
       startedAt: new Date(timestamp).toISOString(),
       metadata: {
-        username: profile.username,
+        phoneNumber: profile.phoneNumber,
+        ...(profile.email ? { email: profile.email } : {}),
       },
     });
 
@@ -406,10 +403,8 @@ class NativeCallUiAdapter implements NativeCallUi {
       return null;
     }
 
-    const metadataUsername = getMetadataValue(incoming.metadata, 'username');
-    const username = metadataUsername && isProfileUsername(metadataUsername)
-      ? metadataUsername
-      : incoming.caller.id.slice(0, 8).toLowerCase();
+    const phoneNumber = getMetadataValue(incoming.metadata, 'phoneNumber') ?? '';
+    const email = getMetadataValue(incoming.metadata, 'email') ?? null;
     const parsedTimestamp = incoming.startedAt ? Date.parse(incoming.startedAt) : NaN;
 
     return {
@@ -418,8 +413,9 @@ class NativeCallUiAdapter implements NativeCallUi {
       peerId: incoming.caller.id,
       kind: incoming.hasVideo ? 'video' : 'voice',
       profile: {
-        username,
+        phoneNumber,
         displayName: incoming.caller.displayName?.trim() || 'Callnet user',
+        email,
         photoURL: incoming.caller.avatarUrl ?? null,
       },
       timestamp: Number.isFinite(parsedTimestamp) ? parsedTimestamp : Date.now(),

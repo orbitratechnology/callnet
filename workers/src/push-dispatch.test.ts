@@ -17,8 +17,9 @@ const invite = createCallEvent({
     kind: 'call',
     callKind: 'video',
     profile: {
-      username: 'caller.one',
+      phoneNumber: '+15550100001',
       displayName: 'Caller One',
+      email: null,
       photoURL: 'https://example.com/avatar.png',
     },
   },
@@ -37,7 +38,7 @@ describe('push dispatch payloads', () => {
         displayName: 'Caller One',
         avatarUrl: 'https://example.com/avatar.png',
       },
-      metadata: { username: 'caller.one' },
+      metadata: { phoneNumber: '+15550100001' },
     });
   });
 

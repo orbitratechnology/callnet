@@ -5,7 +5,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 
@@ -14,14 +13,13 @@ import {
   type AuthService,
   type AuthUser,
 } from './auth-service';
-import { ensureUserProfile } from '../profile/profile-service';
 
 type AuthContextValue = {
   status: 'loading' | 'ready';
   user: AuthUser | null;
   signInWithGoogle(): Promise<void>;
   signInWithEmail(email: string, password: string): Promise<void>;
-  createEmailAccount(email: string, password: string, displayName: string, username: string): Promise<void>;
+  createEmailAccount(email: string, password: string, displayName: string): Promise<void>;
   signOut(): Promise<void>;
   getIdToken(forceRefresh?: boolean): Promise<string>;
 };
@@ -33,25 +31,12 @@ type AuthProviderProps = PropsWithChildren<{ service?: AuthService }>;
 export function AuthProvider({ children, service = authService }: AuthProviderProps) {
   const [status, setStatus] = useState<AuthContextValue['status']>('loading');
   const [user, setUser] = useState<AuthUser | null>(() => service.getCurrentUser());
-  const preferredUsernameRef = useRef<string | null>(null);
-
   useEffect(() => {
     return service.subscribe((nextUser) => {
       setUser(nextUser);
       setStatus('ready');
     });
   }, [service]);
-
-  useEffect(() => {
-    if (!user) {
-      return;
-    }
-    const preferredUsername = preferredUsernameRef.current ?? undefined;
-    preferredUsernameRef.current = null;
-    void ensureUserProfile(user, preferredUsername).catch(() => {
-      // Profile sync should not prevent an authenticated user from opening the app.
-    });
-  }, [user]);
 
   const signInWithGoogle = useCallback(async () => {
     setUser(await service.signInWithGoogle());
@@ -61,16 +46,8 @@ export function AuthProvider({ children, service = authService }: AuthProviderPr
     setUser(await service.signInWithEmail(email, password));
   }, [service]);
 
-  const createEmailAccount = useCallback(async (email: string, password: string, displayName: string, username: string) => {
-    preferredUsernameRef.current = username;
-    try {
-      const nextUser = await service.createEmailAccount(email, password, displayName, username);
-      await ensureUserProfile(nextUser, username);
-      setUser(nextUser);
-    } catch (error) {
-      preferredUsernameRef.current = null;
-      throw error;
-    }
+  const createEmailAccount = useCallback(async (email: string, password: string, displayName: string) => {
+    setUser(await service.createEmailAccount(email, password, displayName));
   }, [service]);
 
   const signOut = useCallback(async () => {

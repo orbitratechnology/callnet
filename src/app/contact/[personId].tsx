@@ -77,7 +77,7 @@ export default function ContactProfileScreen() {
         <Avatar initials={person.initials} photoURL={person.photoURL} size="xl" accessibilityLabel={`${person.name} avatar`} />
         <View style={styles.heroCopy}>
           <ThemedText variant="title" style={styles.centerText}>{person.name}</ThemedText>
-          <ThemedText variant="body" tone="secondary" style={styles.centerText}>{person.handle}</ThemedText>
+          <ThemedText variant="body" tone="secondary" style={styles.centerText}>{person.phoneNumber || 'Callnet contact'}</ThemedText>
           <View style={styles.onlineRow}>
             <View style={styles.onlineDot} />
             <ThemedText variant="caption" tone="secondary">Available for private calls</ThemedText>
@@ -91,17 +91,11 @@ export default function ContactProfileScreen() {
       </View>
 
       <View style={styles.infoCard}>
-        <ContactInfoRow label="Username" value={person.handle} />
+        {person.phoneNumber ? <ContactInfoRow label="Phone" value={person.phoneNumber} /> : null}
         {person.email ? (
           <>
             <View style={styles.separator} />
             <ContactInfoRow label="Email" value={person.email} />
-          </>
-        ) : null}
-        {person.phoneNumber ? (
-          <>
-            <View style={styles.separator} />
-            <ContactInfoRow label="Phone" value={person.phoneNumber} />
           </>
         ) : null}
         <View style={styles.separator} />

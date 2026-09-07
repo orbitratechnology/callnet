@@ -9,8 +9,9 @@ export type CallIdentity = {
 export type CallKind = 'voice' | 'video';
 export type CallTerminationReason = 'cancelled' | 'timed-out';
 export type CallProfile = {
-  username: string;
+  phoneNumber: string;
   displayName: string;
+  email: string | null;
   photoURL: string | null;
 };
 
@@ -84,11 +85,12 @@ function isCallProfile(value: unknown): value is CallProfile {
   }
 
   return (
-    typeof value.username === 'string' &&
-    /^[a-z0-9](?:[a-z0-9._-]{1,28}[a-z0-9])?$/.test(value.username) &&
+    typeof value.phoneNumber === 'string' &&
+    /^\+[1-9]\d{6,14}$/.test(value.phoneNumber) &&
     typeof value.displayName === 'string' &&
     value.displayName.length >= 1 &&
     value.displayName.length <= 80 &&
+    (value.email === null || (typeof value.email === 'string' && value.email.length <= 320)) &&
     (value.photoURL === null || (typeof value.photoURL === 'string' && value.photoURL.length <= 2048))
   );
 }

@@ -17,7 +17,7 @@ import {
 } from '@/constants/theme';
 import type { DemoPerson } from '@/features/contacts/demo-people';
 import type { CallKind } from '@/features/calls/call-state';
-import { normalizeContactIdentifier } from '@/features/profile/profile-service';
+import { normalizePhoneNumber } from '@/features/profile/profile-service';
 
 const MAX_DIGITS = 20;
 
@@ -99,7 +99,7 @@ export function KeypadSheet({
   };
 
   const lookup = async (kind: CallKind) => {
-    const normalizedNumber = normalizeContactIdentifier(digits);
+    const normalizedNumber = normalizePhoneNumber(digits);
     if (!normalizedNumber || normalizedNumber.replace(/^\+/, '').length === 0) {
       setLookupState('error');
       return;
@@ -108,7 +108,7 @@ export function KeypadSheet({
     setLookupKind(kind);
     try {
       const localPerson = contacts.find(
-        (person) => person.phoneNumber && normalizeContactIdentifier(person.phoneNumber) === normalizedNumber,
+        (person) => person.phoneNumber && normalizePhoneNumber(person.phoneNumber) === normalizedNumber,
       );
       if (localPerson) {
         onStartCall(localPerson, kind);

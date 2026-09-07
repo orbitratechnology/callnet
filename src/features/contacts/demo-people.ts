@@ -1,7 +1,6 @@
 export type DemoPerson = {
   id: string;
   name: string;
-  handle: string;
   initials: string;
   photoURL?: string | null;
   email?: string | null;
@@ -14,26 +13,26 @@ export const demoPeople: DemoPerson[] = [
   {
     id: 'maya',
     name: 'Maya Chen',
-    handle: '@mayac',
     initials: 'MC',
     accent: '#000000',
     identityId: 'demo-maya',
+    phoneNumber: '+15550100001',
   },
   {
     id: 'noah',
     name: 'Noah Williams',
-    handle: '@noahw',
     initials: 'NW',
     accent: '#000000',
     identityId: 'demo-noah',
+    phoneNumber: '+15550100002',
   },
   {
     id: 'sofia',
     name: 'Sofia Patel',
-    handle: '@sofiap',
     initials: 'SP',
     accent: '#000000',
     identityId: 'demo-sofia',
+    phoneNumber: '+15550100003',
   },
 ];
 
@@ -54,16 +53,18 @@ export function createContactFromIdentity(
   identityId: string,
   displayName = 'Unknown caller',
   photoURL: string | null = null,
-  username = identityId.slice(0, 8).toLowerCase(),
+  phoneNumber = '',
+  email: string | null = null,
 ): DemoPerson {
   const initials = getInitials(displayName);
 
   return {
     id: `contact-${identityId}`,
     name: displayName,
-    handle: `@${username}`,
     initials,
     photoURL,
+    email,
+    phoneNumber,
     accent: '#000000',
     identityId,
   };

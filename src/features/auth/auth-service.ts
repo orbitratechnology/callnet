@@ -34,7 +34,7 @@ export interface AuthService {
   subscribe(listener: (user: AuthUser | null) => void): () => void;
   signInWithGoogle(): Promise<AuthUser>;
   signInWithEmail(email: string, password: string): Promise<AuthUser>;
-  createEmailAccount(email: string, password: string, displayName: string, username: string): Promise<AuthUser>;
+  createEmailAccount(email: string, password: string, displayName: string): Promise<AuthUser>;
   signOut(): Promise<void>;
   getIdToken(forceRefresh?: boolean): Promise<string>;
 }
@@ -158,7 +158,7 @@ export class FirebaseAuthService implements AuthService {
     return user;
   }
 
-  async createEmailAccount(email: string, password: string, displayName: string, _username: string) {
+  async createEmailAccount(email: string, password: string, displayName: string) {
     const result = await createUserWithEmailAndPassword(firebaseAuth, email, password);
     if (displayName.trim()) {
       await updateProfile(result.user, { displayName: displayName.trim() });

@@ -113,7 +113,7 @@ export default function IncomingCallScreen() {
           <Avatar initials={session.person.initials} photoURL={session.person.photoURL} size="xl" />
         </View>
         <ThemedText variant="largeTitle" style={[styles.centered, styles.callOnSurfaceText]}>{session.person.name}</ThemedText>
-        <ThemedText variant="body" style={[styles.centered, styles.secondaryText]}>{session.person.handle}</ThemedText>
+        <ThemedText variant="body" style={[styles.centered, styles.secondaryText]}>{session.person.phoneNumber || 'Callnet contact'}</ThemedText>
         <View style={styles.statusPill}>
           <View style={styles.statusDot} />
           <ThemedText variant="subhead" style={styles.callOnSurfaceText}>Calling you now</ThemedText>

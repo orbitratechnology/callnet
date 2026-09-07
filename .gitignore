@@ -47,3 +47,7 @@ modules/**/android/build/
 modules/**/android/.gradle/
 google-services.json
 GoogleService-Info.plist
+
+# Logs
+
+*.log

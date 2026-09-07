@@ -1,7 +1,7 @@
 import { getFirebaseAccessToken } from './push-dispatch';
 
 const MAX_CONTACTS = 500;
-const MAX_TOKENS_PER_CONTACT = 32;
+const MAX_TOKENS_PER_CONTACT = 8;
 const MAX_UNIQUE_TOKENS = 1200;
 const MAX_RESULTS_PER_QUERY = 100;
 const MAX_QUERY_TOKENS = 30;
@@ -14,8 +14,7 @@ type DirectoryEnvironment = {
 };
 
 type FirestoreStringValue = { stringValue?: unknown };
-type FirestoreArrayValue = { values?: FirestoreStringValue[] };
-type FirestoreField = FirestoreStringValue & { arrayValue?: FirestoreArrayValue };
+type FirestoreField = FirestoreStringValue;
 type FirestoreDocument = { fields?: Record<string, FirestoreField> };
 
 export type DirectoryContactInput = {
@@ -25,8 +24,9 @@ export type DirectoryContactInput = {
 
 export type DirectoryProfile = {
   uid: string;
-  username: string;
+  phoneNumber: string;
   displayName: string;
+  email: string | null;
   photoURL: string | null;
 };
 
@@ -38,13 +38,6 @@ export type DirectoryContactMatch = {
 function getStringField(fields: Record<string, FirestoreField> | undefined, name: string) {
   const value = fields?.[name]?.stringValue;
   return typeof value === 'string' && value.length > 0 ? value : undefined;
-}
-
-function getSearchTokens(fields: Record<string, FirestoreField> | undefined) {
-  const values = fields?.searchTokens?.arrayValue?.values;
-  return Array.isArray(values)
-    ? values.flatMap((value) => typeof value.stringValue === 'string' ? [value.stringValue] : [])
-    : [];
 }
 
 async function readResponseWithinLimit(response: Response) {
@@ -70,17 +63,24 @@ function readProfile(item: unknown, requesterUid: string) {
   const document = (item as { document?: FirestoreDocument }).document;
   const fields = document?.fields;
   const uid = getStringField(fields, 'uid');
-  const username = getStringField(fields, 'username');
+  const phoneHash = getStringField(fields, 'phoneHash');
+  const phoneNumber = getStringField(fields, 'phoneNumber');
   const displayName = getStringField(fields, 'displayName');
-  if (!uid || uid === requesterUid || !username || !displayName) {
+  if (!uid || uid === requesterUid || !phoneHash || !phoneNumber || !displayName) {
     return null;
   }
 
+  const emailValue = fields?.email?.stringValue;
   const photoURLValue = fields?.photoURL?.stringValue;
-  const photoURL = typeof photoURLValue === 'string' ? photoURLValue : null;
   return {
-    profile: { uid, username, displayName, photoURL } satisfies DirectoryProfile,
-    tokens: new Set(getSearchTokens(fields)),
+    phoneHash,
+    profile: {
+      uid,
+      phoneNumber,
+      displayName,
+      email: typeof emailValue === 'string' ? emailValue : null,
+      photoURL: typeof photoURLValue === 'string' ? photoURLValue : null,
+    } satisfies DirectoryProfile,
   };
 }
 
@@ -93,7 +93,9 @@ export async function matchDirectoryContacts(
     .slice(0, MAX_CONTACTS)
     .map((contact) => ({
       contactId: contact.contactId.trim().slice(0, 160),
-      tokens: [...new Set(contact.tokens)].filter((token) => /^[a-f0-9]{64}$/i.test(token)).slice(0, MAX_TOKENS_PER_CONTACT),
+      tokens: [...new Set(contact.tokens)]
+        .filter((token) => /^[a-f0-9]{64}$/i.test(token))
+        .slice(0, MAX_TOKENS_PER_CONTACT),
     }))
     .filter((contact) => contact.contactId.length > 0 && contact.tokens.length > 0);
 
@@ -123,11 +125,11 @@ export async function matchDirectoryContacts(
         },
         body: JSON.stringify({
           structuredQuery: {
-            from: [{ collectionId: 'userSearch' }],
+            from: [{ collectionId: 'phoneDirectory' }],
             where: {
               fieldFilter: {
-                field: { fieldPath: 'searchTokens' },
-                op: 'ARRAY_CONTAINS_ANY',
+                field: { fieldPath: 'phoneHash' },
+                op: 'IN',
                 value: { arrayValue: { values: tokenGroup.map((token) => ({ stringValue: token })) } },
               },
             },
@@ -152,14 +154,11 @@ export async function matchDirectoryContacts(
       if (!parsed) {
         continue;
       }
-      for (const token of tokens) {
-        if (!parsed.tokens.has(token)) {
-          continue;
-        }
-        for (const contactId of tokenToContactIds.get(token) ?? []) {
-          const match = { contactId, profile: parsed.profile } satisfies DirectoryContactMatch;
-          matches.set(`${contactId}:${parsed.profile.uid}`, match);
-        }
+      for (const contactId of tokenToContactIds.get(parsed.phoneHash) ?? []) {
+        matches.set(`${contactId}:${parsed.profile.uid}`, {
+          contactId,
+          profile: parsed.profile,
+        });
       }
     }
   }

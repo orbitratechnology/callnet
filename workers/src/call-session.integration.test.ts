@@ -7,8 +7,9 @@ import {
 import { isServerSignalingMessage } from './protocol';
 
 const profile = {
-  username: 'caller',
+  phoneNumber: '+15550100001',
   displayName: 'Caller',
+  email: null,
   photoURL: null,
 };
 

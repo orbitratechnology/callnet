@@ -33,8 +33,8 @@ export default function ProfileScreen() {
             <Avatar initials={getInitials(displayName)} photoURL={photoURL} size="xl" />
             <View style={styles.heroCopy}>
               <ThemedText variant="title">{displayName}</ThemedText>
-              {profile?.username ? (
-                <ThemedText variant="body" tone="brand">@{profile.username}</ThemedText>
+              {profile?.phoneNumber ? (
+                <ThemedText variant="body" tone="brand">{profile.phoneNumber}</ThemedText>
               ) : null}
               <ThemedText variant="subhead" tone="secondary" selectable>
                 {user?.email ?? 'Email not available'}
@@ -46,7 +46,7 @@ export default function ProfileScreen() {
             Your account works across your devices.
           </ThemedText>
           <ThemedText variant="caption" tone="secondary">
-            Your username helps people recognize you when you connect with them.
+            Your phone number is your unique Callnet identity.
           </ThemedText>
 
           <View style={styles.section}>
@@ -55,6 +55,7 @@ export default function ProfileScreen() {
             <View style={styles.privacyList}>
               <PrivacyRow title="Media" description="Callnet does not record audio or video." />
               <PrivacyRow title="Connections" description="Calls are private and protected while they connect." />
+              <PrivacyRow title="Phone number" description="Your phone number is used to connect you with people in your phone contacts." />
               <PrivacyRow title="Call history" description="Detailed recent-call history is kept locally on this device." />
               <PrivacyRow title="Permissions" description="Microphone and camera access are requested only when a call needs them." />
             </View>

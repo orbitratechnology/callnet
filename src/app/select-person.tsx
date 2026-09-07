@@ -23,6 +23,8 @@ type MatchedContact = {
   profile: UserProfile;
 };
 
+type ContactLoadError = 'load-failed' | 'session-expired' | 'service-unavailable';
+
 function MatchedContactRow({
   match,
   isAdded,
@@ -33,7 +35,7 @@ function MatchedContactRow({
   onAdd: () => void;
 }) {
   const brand = useBrandColors();
-  const detail = match.device.phoneNumber || match.device.email || `@${match.profile.username}`;
+  const detail = match.profile.phoneNumber || match.device.phoneNumber || match.profile.email || match.device.email || 'Callnet contact';
 
   return (
     <View style={styles.contactRow}>
@@ -123,12 +125,18 @@ function PermissionState({
   );
 }
 
-function EmptyState({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+function EmptyState({ error, onRetry }: { error: ContactLoadError | null; onRetry: () => void }) {
+  const message = error === 'session-expired'
+    ? 'Sign in again to check your contacts.'
+    : error === 'service-unavailable'
+      ? 'Callnet is temporarily unavailable. Try again in a moment.'
+      : 'Check your connection and try again.';
+
   return (
     <View style={styles.emptyState}>
       <ThemedText variant="headline">{error ? 'We couldn’t check your contacts.' : 'No one from your contacts is on Callnet yet.'}</ThemedText>
       <ThemedText variant="subhead" tone="secondary">
-        {error ? 'Check your connection and try again.' : 'When a contact joins Callnet, they’ll appear here.'}
+        {error ? message : 'When a contact joins Callnet, they’ll appear here.'}
       </ThemedText>
       {error ? <Button title="Try again" variant="secondary" size="sm" onPress={onRetry} /> : null}
     </View>
@@ -142,7 +150,7 @@ export default function SelectPersonScreen() {
   const [permission, setPermission] = useState<DeviceContactsPermission | null>(null);
   const [matches, setMatches] = useState<MatchedContact[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ContactLoadError | null>(null);
 
   const loadMatches = useCallback(async () => {
     setIsLoading(true);
@@ -160,9 +168,16 @@ export default function SelectPersonScreen() {
         return [{ device, profile: match.profile }];
       });
       setMatches(nextMatches);
-    } catch {
+    } catch (loadError) {
       setMatches([]);
-      setError('load-failed');
+      const message = loadError instanceof Error ? loadError.message : '';
+      setError(
+        message.includes('session has expired')
+          ? 'session-expired'
+          : message.includes('temporarily unavailable')
+            ? 'service-unavailable'
+            : 'load-failed',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -196,11 +211,10 @@ export default function SelectPersonScreen() {
   const addOne = useCallback((match: MatchedContact) => {
     addContact({
       name: match.profile.displayName,
-      handle: `@${match.profile.username}`,
       initials: getInitials(match.profile.displayName),
       photoURL: match.profile.photoURL,
-      email: match.device.email,
-      phoneNumber: match.device.phoneNumber,
+      email: match.profile.email ?? match.device.email,
+      phoneNumber: match.profile.phoneNumber,
       accent: '#000000',
       identityId: match.profile.uid,
     });

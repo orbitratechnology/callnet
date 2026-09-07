@@ -16,7 +16,7 @@ import {
     getInitials,
     type DemoPerson,
 } from '../contacts/demo-people';
-import { ensureUserProfile } from '../profile/profile-service';
+import { getUserProfile } from '../profile/profile-service';
 import {
     createRecentCallRepository,
     type RecentCall,
@@ -125,13 +125,17 @@ export function CallProvider({
       throw new Error('Sign in before connecting to calls.');
     }
     if (!realControllerRef.current) {
-      const profile = await ensureUserProfile(user);
+      const profile = await getUserProfile(user.uid);
+      if (!profile) {
+        throw new Error('Add your phone number before making calls.');
+      }
       realControllerRef.current = new WebRTCCallController({
         identity: { mode: 'firebase', uid: user.uid },
         authToken: idToken,
         profile: {
-          username: profile.username,
+          phoneNumber: profile.phoneNumber,
           displayName: profile.displayName,
+          email: profile.email,
           photoURL: profile.photoURL,
         },
         signalingUrl: getSignalingUrl(),
@@ -205,15 +209,17 @@ export function CallProvider({
         ? {
             ...existingContact,
             name: event.profile.displayName,
-            handle: `@${event.profile.username}`,
             initials: getInitials(event.profile.displayName),
             photoURL: event.profile.photoURL,
+            email: event.profile.email,
+            phoneNumber: event.profile.phoneNumber,
           }
         : createContactFromIdentity(
             event.from,
             event.profile.displayName,
             event.profile.photoURL,
-            event.profile.username,
+            event.profile.phoneNumber,
+            event.profile.email,
           );
       if (sessionRef.current && isActiveState(sessionRef.current.state)) {
         return;
@@ -425,8 +431,9 @@ export function CallProvider({
           peerId: person.identityId,
           kind,
           peerProfile: {
-            username: person.handle.replace(/^@/, ''),
+            phoneNumber: person.phoneNumber ?? '',
             displayName: person.name,
+            email: person.email ?? null,
             photoURL: person.photoURL ?? null,
           },
         }));

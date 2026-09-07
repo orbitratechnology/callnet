@@ -41,7 +41,8 @@ export type IncomingCallPushEvent = {
     avatarUrl?: string;
   };
   metadata: {
-    username: string;
+    phoneNumber: string;
+    email?: string;
   };
 };
 
@@ -288,7 +289,10 @@ export function createIncomingCallPushEvent(event: CallEvent): IncomingCallPushE
     hasVideo: event.payload.callKind === 'video',
     startedAt: new Date(event.timestamp).toISOString(),
     caller,
-    metadata: { username: event.payload.profile.username },
+    metadata: {
+      phoneNumber: event.payload.profile.phoneNumber,
+      ...(event.payload.profile.email ? { email: event.payload.profile.email } : {}),
+    },
   };
 }
 

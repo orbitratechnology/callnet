@@ -164,7 +164,7 @@ export class WebRTCCallController {
       await this.nativeCallUi.startOutgoing(
         input.callId,
         input.peerId,
-        input.peerProfile ?? { username: 'callnet-user', displayName: 'Callnet user', photoURL: null },
+        input.peerProfile ?? { phoneNumber: '', displayName: 'Callnet user', email: null, photoURL: null },
         input.kind,
       );
       await this.startLocalMedia(input.kind);

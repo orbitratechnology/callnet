@@ -7,6 +7,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: config.name ?? 'Callnet',
   slug: config.slug ?? 'callnet',
+  plugins: [...(config.plugins ?? []), 'expo-localization'],
   ios: {
     ...config.ios,
     googleServicesFile: process.env.GOOGLE_SERVICE_INFO_PLIST ?? localGoogleServiceInfoPlist,
