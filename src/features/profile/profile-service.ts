@@ -142,88 +142,94 @@ function profileFromData(data: DocumentData | undefined): UserProfile | null {
 
 export async function ensureUserProfile(user: AuthUser, preferredUsername?: string) {
   const userRef = doc(firebaseDb, 'users', user.uid);
-  return runTransaction(firebaseDb, async (transaction) => {
-    const profileSnapshot = await transaction.get(userRef);
-    const currentProfile = profileFromData(profileSnapshot.data());
-    const keepExistingUsername = Boolean(
-      currentProfile &&
-      isValidUsername(currentProfile.username) &&
-      !isLegacyUsername(currentProfile.username, user.uid),
-    );
-    const requestedUsername = preferredUsername
-      ? normalizeUsername(preferredUsername)
-      : suggestUsername(user);
-    if (preferredUsername && !isValidUsername(requestedUsername)) {
-      throw new Error('Choose a valid Callnet username before continuing.');
-    }
-    const candidates = keepExistingUsername
-      ? [currentProfile!.username]
-      : usernameCandidates(requestedUsername, user.uid);
-    const usernameSnapshots = await Promise.all(
-      candidates.map((candidate) => transaction.get(doc(firebaseDb, 'usernames', candidate))),
-    );
-    const usernameIndex = usernameSnapshots.findIndex((snapshot) => {
-      const claimedUid = snapshot.data()?.uid;
-      return !snapshot.exists() || claimedUid === user.uid;
-    });
-    const username = candidates[usernameIndex];
+  const requestedUsername = preferredUsername
+    ? normalizeUsername(preferredUsername)
+    : suggestUsername(user);
+  if (preferredUsername && !isValidUsername(requestedUsername)) {
+    throw new Error('Choose a valid Callnet username before continuing.');
+  }
 
-    if (!username) {
-      throw new Error('That username is already in use. Choose another username.');
-    }
+  const displayName = getDisplayName(user);
+  const photoURL = user.photoURL ?? null;
+  const candidates = usernameCandidates(requestedUsername, user.uid);
 
-    const displayName = getDisplayName(user);
-    const photoURL = user.photoURL ?? null;
-    const searchValues = [
-      ...getPrefixValues(displayName),
-      ...getPrefixValues(username),
-      ...(user.email ? [user.email] : []),
-      ...(user.phoneNumber ? [user.phoneNumber] : []),
-    ];
-    const searchTokens = await createDirectorySearchTokens(searchValues);
+  for (const candidate of candidates) {
+    const profile = await runTransaction(firebaseDb, async (transaction) => {
+      const profileSnapshot = await transaction.get(userRef);
+      const currentProfile = profileFromData(profileSnapshot.data());
+      const keepExistingUsername = Boolean(
+        currentProfile &&
+        isValidUsername(currentProfile.username) &&
+        !isLegacyUsername(currentProfile.username, user.uid),
+      );
+      const username = keepExistingUsername ? currentProfile!.username : candidate;
+      const usernameRef = doc(firebaseDb, 'usernames', username);
+      const usernameSnapshot = await transaction.get(usernameRef);
+      const claimedUid = usernameSnapshot.data()?.uid;
 
-    if (!currentProfile) {
-      transaction.set(userRef, {
+      if (usernameSnapshot.exists() && claimedUid !== user.uid) {
+        if (keepExistingUsername) {
+          throw new Error('Your Callnet username is no longer available.');
+        }
+        return null;
+      }
+
+      const searchValues = [
+        ...getPrefixValues(displayName),
+        ...getPrefixValues(username),
+        ...(user.email ? [user.email] : []),
+        ...(user.phoneNumber ? [user.phoneNumber] : []),
+      ];
+      const searchTokens = await createDirectorySearchTokens(searchValues);
+
+      if (!currentProfile) {
+        transaction.set(userRef, {
+          uid: user.uid,
+          username,
+          displayName,
+          photoURL,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } else if (
+        currentProfile.username !== username ||
+        currentProfile.displayName !== displayName ||
+        currentProfile.photoURL !== photoURL
+      ) {
+        transaction.update(userRef, {
+          username,
+          displayName,
+          photoURL,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      if (!usernameSnapshot.exists()) {
+        transaction.set(usernameRef, { uid: user.uid });
+      }
+
+      transaction.set(doc(firebaseDb, 'userSearch', user.uid), {
+        uid: user.uid,
+        displayName,
+        username,
+        photoURL,
+        searchTokens,
+      });
+
+      return {
         uid: user.uid,
         username,
         displayName,
         photoURL,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    } else if (
-      currentProfile.username !== username ||
-      currentProfile.displayName !== displayName ||
-      currentProfile.photoURL !== photoURL
-    ) {
-      transaction.update(userRef, {
-        username,
-        displayName,
-        photoURL,
-        updatedAt: serverTimestamp(),
-      });
-    }
-
-    if (!usernameSnapshots[usernameIndex].exists()) {
-      const usernameRef = doc(firebaseDb, 'usernames', username);
-      transaction.set(usernameRef, { uid: user.uid });
-    }
-
-    transaction.set(doc(firebaseDb, 'userSearch', user.uid), {
-      uid: user.uid,
-      displayName,
-      username,
-      photoURL,
-      searchTokens,
+      } satisfies UserProfile;
     });
 
-    return {
-      uid: user.uid,
-      username,
-      displayName,
-      photoURL,
-    } satisfies UserProfile;
-  });
+    if (profile) {
+      return profile;
+    }
+  }
+
+  throw new Error('That username is already in use. Choose another username.');
 }
 
 export async function getUserProfile(uid: string) {

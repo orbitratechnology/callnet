@@ -78,7 +78,10 @@ export default function ContactProfileScreen() {
         <View style={styles.heroCopy}>
           <ThemedText variant="title" style={styles.centerText}>{person.name}</ThemedText>
           <ThemedText variant="body" tone="secondary" style={styles.centerText}>{person.handle}</ThemedText>
-          <ThemedText variant="caption" tone="brand" style={styles.centerText}>Callnet contact</ThemedText>
+          <View style={styles.onlineRow}>
+            <View style={styles.onlineDot} />
+            <ThemedText variant="caption" tone="secondary">Available for private calls</ThemedText>
+          </View>
         </View>
       </View>
 
@@ -94,7 +97,7 @@ export default function ContactProfileScreen() {
       </View>
 
       <ThemedText variant="subhead" tone="secondary" style={styles.privacyCopy} selectable>
-        Calls use WebRTC. Audio and video are not recorded.
+        Calls are private. Audio and video are not recorded.
       </ThemedText>
     </ScrollView>
   );
@@ -115,10 +118,13 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', gap: Spacing.lg },
   heroCopy: { alignItems: 'center', gap: Spacing.xs },
   centerText: { textAlign: 'center' },
-  actions: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.xxl },
-  actionItem: { alignItems: 'center', gap: Spacing.sm, minWidth: 80 },
+  onlineRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginTop: Spacing.xs },
+  onlineDot: { width: 8, height: 8, borderRadius: Radius.full, backgroundColor: Colors.success },
+  actions: { width: '100%', flexDirection: 'row', justifyContent: 'center', gap: Spacing.sm },
+  actionItem: { flex: 1, alignItems: 'center', gap: Spacing.sm, minWidth: 80 },
   actionButton: {
-    width: 64,
+    width: '100%',
+    maxWidth: 128,
     height: 64,
     alignItems: 'center',
     justifyContent: 'center',

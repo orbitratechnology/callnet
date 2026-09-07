@@ -196,7 +196,7 @@ export default function SelectPersonScreen() {
             initials={person.initials}
             photoURL={person.photoURL}
             detail={person.handle}
-            onPress={() => router.push({ pathname: '/call', params: { personId: person.id } })}
+            onPress={() => router.push({ pathname: '/contact/[personId]', params: { personId: person.id } })}
           />
         )}
       />

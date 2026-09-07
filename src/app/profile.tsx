@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
+import { Host, Switch as NativeSwitch } from '@expo/ui';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
@@ -45,10 +46,10 @@ export default function ProfileScreen() {
           </View>
 
           <ThemedText variant="body" tone="secondary" selectable>
-            Your account identifies you securely across devices.
+            Your account works across your devices.
           </ThemedText>
           <ThemedText variant="caption" tone="secondary">
-            Share your @username so people can find you securely.
+            Share your @username so people can find you.
           </ThemedText>
 
           <View style={styles.section}>
@@ -67,14 +68,15 @@ export default function ProfileScreen() {
                   {mode === 'dark' ? 'On' : 'Off'}
                 </ThemedText>
               </View>
-              <Switch
-                value={mode === 'dark'}
-                accessible={false}
-                pointerEvents="none"
-                trackColor={{ false: '#D4D4D4', true: '#FFFFFF' }}
-                thumbColor={mode === 'dark' ? '#000000' : '#FFFFFF'}
-                ios_backgroundColor="#D4D4D4"
-              />
+              <Host matchContents colorScheme={mode} style={styles.nativeSwitch}>
+                <NativeSwitch
+                  value={mode === 'dark'}
+                  onValueChange={(value) => {
+                    if (value !== (mode === 'dark')) toggleMode();
+                  }}
+                  testID="theme-switch"
+                />
+              </Host>
             </Pressable>
           </View>
 
@@ -82,8 +84,8 @@ export default function ProfileScreen() {
             <ThemedText variant="caption" tone="brand">PRIVACY</ThemedText>
             <ThemedText variant="headline">Clear, limited data handling</ThemedText>
             <View style={styles.privacyList}>
-              <PrivacyRow title="Media" description="Calls use WebRTC. Callnet does not record audio or video." />
-              <PrivacyRow title="Connections" description="Direct connections are preferred. TURN may relay encrypted media when needed." />
+              <PrivacyRow title="Media" description="Callnet does not record audio or video." />
+              <PrivacyRow title="Connections" description="Calls are private and protected while they connect." />
               <PrivacyRow title="Call history" description="Detailed recent-call history is kept locally on this device." />
               <PrivacyRow title="Permissions" description="Microphone and camera access are requested only when a call needs them." />
             </View>
@@ -130,6 +132,7 @@ const styles = StyleSheet.create({
     boxShadow: Shadows.card,
   },
   themeCopy: { flex: 1, gap: Spacing.xs },
+  nativeSwitch: { minWidth: 56, minHeight: 40, alignItems: 'flex-end', justifyContent: 'center' },
   privacyList: {
     overflow: 'hidden',
     borderRadius: Radius.md,

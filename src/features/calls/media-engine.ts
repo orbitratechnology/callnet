@@ -57,6 +57,9 @@ type WebRTCModule = {
   mediaDevices: {
     getUserMedia(constraints: Record<string, unknown>): Promise<MediaStreamLike>;
   };
+  permissions?: {
+    request(permission: { name: 'camera' | 'microphone' }): Promise<unknown>;
+  };
   RTCPeerConnection: new (configuration: { iceServers: Array<{ urls: string | string[]; username?: string; credential?: string }> }) => PeerConnectionLike;
   RTCSessionDescription?: new (description: SessionDescription) => SessionDescription;
   RTCIceCandidate?: new (candidate: IceCandidate) => IceCandidate;
@@ -98,6 +101,27 @@ function loadWebRTCModule() {
 
 const defaultIceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
 
+function isPermissionDeniedError(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const value = error as { name?: unknown; code?: unknown; message?: unknown };
+  const details = [value.name, value.code, value.message]
+    .filter((detail): detail is string => typeof detail === 'string')
+    .join(' ')
+    .toLowerCase();
+
+  return details.includes('notallowed') ||
+    details.includes('permissiondenied') ||
+    /permission\s+(was\s+)?denied/.test(details) ||
+    /access\s+(was\s+)?denied/.test(details);
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function getStreamTracks(stream: MediaStreamLike) {
   try {
     const tracks = stream.getTracks?.();
@@ -137,6 +161,20 @@ export class NativeWebRTCMediaEngine implements MediaEngine {
         return 'granted' as const;
       }
 
+      if (this.rtc.permissions) {
+        const microphoneGranted = await this.rtc.permissions.request({ name: 'microphone' });
+        if (microphoneGranted !== true && microphoneGranted !== 'granted') {
+          return 'denied' as const;
+        }
+
+        if (kind === 'video') {
+          const cameraGranted = await this.rtc.permissions.request({ name: 'camera' });
+          if (cameraGranted !== true && cameraGranted !== 'granted') {
+            return 'denied' as const;
+          }
+        }
+      }
+
       const stream = await this.rtc.mediaDevices.getUserMedia({
         audio: true,
         video: kind === 'video' ? { facingMode: 'user' } : false,
@@ -147,8 +185,12 @@ export class NativeWebRTCMediaEngine implements MediaEngine {
         streamUrl: stream.toURL?.() ?? '',
       };
       return 'granted' as const;
-    } catch {
-      return 'denied' as const;
+    } catch (error) {
+      if (isPermissionDeniedError(error)) {
+        return 'denied' as const;
+      }
+
+      throw new Error(`${kind}-media-unavailable:${getErrorMessage(error)}`);
     }
   }
 

@@ -55,7 +55,7 @@ function mapUser(user: FirebaseUser | null): AuthUser | null {
 
 export function getAuthErrorMessage(error: unknown) {
   const code = typeof error === 'object' && error && 'code' in error
-    ? String((error as { code?: unknown }).code)
+    ? String((error as { code?: unknown }).code).toLowerCase()
     : '';
 
   if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) {
@@ -71,22 +71,31 @@ export function getAuthErrorMessage(error: unknown) {
     return 'Enter a valid email address.';
   }
   if (code.includes('operation-not-allowed')) {
-    return 'This sign-in method is not enabled for Callnet yet.';
+    return 'This sign-in option is not available right now.';
   }
   if (code.includes('account-exists-with-different-credential')) {
-    return 'That email is already linked to another sign-in method.';
+    return 'That email is already connected to another sign-in option.';
   }
-  if (code === '10' || code.includes('DEVELOPER_ERROR')) {
-    return 'Google Sign-In is not configured for this app build yet.';
+  if (code === '10' || code.includes('developer_error')) {
+    return 'Google sign-in is not available right now. Try email instead.';
   }
-  if (code === '12501' || code.includes('SIGN_IN_CANCELLED')) {
-    return 'Google sign-in was cancelled.';
+  if (code === '12501' || code.includes('sign_in_cancelled') || code.includes('popup-closed-by-user')) {
+    return 'Sign-in cancelled.';
   }
-  if (code === '2' || code.includes('PLAY_SERVICES_NOT_AVAILABLE')) {
-    return 'Google Play Services must be updated before signing in.';
+  if (code === '2' || code.includes('play_services_not_available')) {
+    return 'Update Google services on this device, then try again.';
+  }
+  if (code.includes('too-many-requests')) {
+    return 'Too many attempts. Wait a moment and try again.';
+  }
+  if (code.includes('network-request-failed') || code.includes('unavailable') || code.includes('deadline-exceeded')) {
+    return 'No internet connection. Check your connection and try again.';
+  }
+  if (code.includes('user-disabled')) {
+    return 'This account is not available.';
   }
 
-  return error instanceof Error ? error.message : 'Authentication failed. Please try again.';
+  return 'We couldn’t complete sign-in. Check your details and try again.';
 }
 
 export class FirebaseAuthService implements AuthService {

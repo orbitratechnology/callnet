@@ -61,9 +61,10 @@ export default function TabsLayout() {
         tabBarShowLabel: false,
         tabBarItemStyle: { flex: 1 },
         tabBarStyle: {
-          height: 64 + insets.bottom,
-          paddingTop: 12,
-          paddingBottom: insets.bottom + 8,
+          height: 72 + insets.bottom,
+          paddingHorizontal: Spacing.md,
+          paddingTop: 10,
+          paddingBottom: insets.bottom + 10,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: Colors.separator,
           backgroundColor: Colors.secondaryBackground,
@@ -74,6 +75,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Calls',
+          headerTitleStyle: { display: 'none' },
           headerLeft: () => <CallnetBrand />,
           headerRight: () => (
             <HeaderProfileButton

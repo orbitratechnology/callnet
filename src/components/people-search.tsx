@@ -1,10 +1,11 @@
-import { Share, StyleSheet, TextInput, View } from 'react-native';
+import { Share, StyleSheet, View } from 'react-native';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 
 import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { SearchBar } from '@/components/ui/search-bar';
+import { Colors, Radius, Shadows, Spacing } from '@/constants/theme';
 import type { DemoPerson } from '@/features/contacts/demo-people';
 import { getInitials } from '@/features/contacts/demo-people';
 import type { CallKind } from '@/features/calls/call-state';
@@ -163,21 +164,17 @@ export function PeopleSearch({
 
   return (
     <View style={styles.container}>
-      <View style={styles.inputShell}>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Name, @username, phone, or email"
-          placeholderTextColor={Colors.secondaryLabel as string}
-          style={styles.input}
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-          accessibilityLabel="Search people"
-          accessibilityRole="search"
-        />
-      </View>
+      <SearchBar
+        value={query}
+        onChangeText={setQuery}
+        onClear={() => setQuery('')}
+        placeholder="Search people"
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="search"
+        accessibilityLabel="Search people by name, username, phone, or email"
+        accessibilityRole="search"
+      />
 
       {showSearchState ? (
         <View style={styles.resultsCard}>
@@ -210,24 +207,14 @@ export function PeopleSearch({
 
 const styles = StyleSheet.create({
   container: { gap: Spacing.sm },
-  inputShell: {
-    minHeight: 48,
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.separator,
-    backgroundColor: Colors.secondaryBackground,
-  },
-  input: {
-    minHeight: 48,
-    paddingHorizontal: Spacing.md,
-    color: Colors.label as string,
-    fontSize: 16,
-  },
   resultsCard: {
     gap: Spacing.md,
     padding: Spacing.md,
     borderRadius: Radius.md,
     backgroundColor: Colors.secondaryBackground,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.separator,
+    boxShadow: Shadows.raised,
   },
   resultRow: { gap: Spacing.md },
   personCopy: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },

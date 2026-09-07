@@ -14,7 +14,7 @@ function LoadingScreen() {
   return (
     <View style={[styles.loadingScreen, { backgroundColor }]}>
       <ThemedText variant="title">Callnet</ThemedText>
-      <ThemedText variant="body" tone="secondary">Restoring your secure session…</ThemedText>
+      <ThemedText variant="body" tone="secondary">Getting your calls ready…</ThemedText>
     </View>
   );
 }

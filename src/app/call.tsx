@@ -17,10 +17,10 @@ import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { CallColors, Colors, Motion, Radius, Spacing, useThemeBackground } from '@/constants/theme';
+import { CallColors, Colors, Motion, Radius, Shadows, Spacing, useThemeBackground } from '@/constants/theme';
 import { useCall } from '@/features/calls/call-provider';
-import type { CallKind, CallState } from '@/features/calls/call-state';
-import { redactDiagnostic } from '../../shared/diagnostics';
+import type { CallState } from '@/features/calls/call-state';
+import { getCallFailureMessage } from '@/features/calls/call-messages';
 
 type RtcViewProps = {
   streamURL: string;
@@ -95,7 +95,7 @@ function VideoSurface({
   }));
 
   const placeholderMessage = !RTCView
-    ? 'Video preview requires the WebRTC development client.'
+    ? 'Video preview is not available on this device.'
     : remoteStreamUrl
       ? null
       : state === 'connecting'
@@ -138,9 +138,9 @@ function getStateLabel(state: CallState, direction?: 'incoming' | 'outgoing') {
   if (state === 'connecting') return 'Connecting…';
   if (state === 'connected') return 'Connected';
   if (state === 'ending') return 'Ending call…';
-  if (state === 'failed') return 'Call failed';
+  if (state === 'failed') return 'Call ended';
   if (state === 'ended') return 'Call ended';
-  return 'Ready to call';
+  return 'Starting call…';
 }
 
 function formatDuration(seconds: number) {
@@ -153,17 +153,18 @@ function isTerminal(state: CallState | undefined) {
   return state === 'ended' || state === 'failed';
 }
 
+function isMediaPermissionFailure(reason?: string) {
+  return Boolean(reason && (reason.includes('permission-denied') || /permission.*denied/i.test(reason)));
+}
+
 export default function CallScreen() {
   const { personId } = useLocalSearchParams<{ personId?: string }>();
   const insets = useSafeAreaInsets();
   const backgroundColor = useThemeBackground();
   const {
     session,
-    transportMode,
-    transportError,
     localStreamUrl,
     remoteStreamUrl,
-    startOutgoing,
     acceptIncoming,
     reject,
     cancel,
@@ -205,7 +206,6 @@ export default function CallScreen() {
   const currentState = isCurrentSession ? session?.state : undefined;
   const isIncoming = isCurrentSession && session?.direction === 'incoming' && currentState === 'ringing';
   const isBusyWithAnotherPerson = Boolean(session && !isTerminal(session.state) && !isCurrentSession);
-  const isReady = !session || !isCurrentSession;
   const isVideoCall = Boolean(
     session?.kind === 'video' &&
       isCurrentSession &&
@@ -216,9 +216,8 @@ export default function CallScreen() {
   const isActiveCall = Boolean(currentState && currentState !== 'idle' && !isTerminal(currentState));
   const duration = session?.connectedAt ? Math.max(0, Math.floor((now - session.connectedAt) / 1000)) : 0;
   const failureReason = session?.failureReason;
-  const permissionDenied = currentState === 'failed' && failureReason?.includes('permission');
-  const peerBusy = failureReason?.includes('peer-busy');
-  const diagnostic = failureReason ? redactDiagnostic(failureReason) : null;
+  const permissionDenied = currentState === 'failed' && isMediaPermissionFailure(failureReason);
+  const hasCallOutcome = currentState === 'failed' || Boolean(currentState === 'ended' && failureReason);
 
   useEffect(() => {
     if (!isActiveCall || currentState !== 'connected') {
@@ -247,7 +246,7 @@ export default function CallScreen() {
       <View style={[styles.emptyContainer, { backgroundColor }]}>
         <Stack.Screen options={{ title: 'Call', headerShown: false }} />
         <View style={styles.emptyCopy}>
-          <ThemedText variant="title" style={styles.centered}>No person selected</ThemedText>
+          <ThemedText variant="title" style={styles.centered}>Choose a person to call</ThemedText>
           <ThemedText variant="body" tone="secondary" style={styles.centered}>
             Choose someone before starting a call.
           </ThemedText>
@@ -256,10 +255,6 @@ export default function CallScreen() {
       </View>
     );
   }
-
-  const startCall = (kind: CallKind) => {
-    void startOutgoing(selectedPerson, kind);
-  };
 
   const closeCall = () => {
     resetCall();
@@ -354,21 +349,15 @@ export default function CallScreen() {
           ) : null}
         </Animated.View>
 
-        {currentState === 'failed' ? (
+        {hasCallOutcome ? (
           <View style={[styles.failureCopy, { top: contentTop + 156 }]}>
             <ThemedText variant="subhead" style={[styles.centered, styles.callSecondaryText]}>
-              {peerBusy
-              ? 'That person is already on another call.'
-              : permissionDenied
-                ? 'Microphone or camera permission was denied.'
-                : transportMode === 'webrtc'
-                    ? 'The authenticated call could not connect.'
-                    : 'The demo call could not connect'}
+              {getCallFailureMessage(failureReason, session?.kind ?? 'voice')}
             </ThemedText>
             {permissionDenied ? (
               <>
                 <ThemedText variant="caption" style={[styles.centered, styles.callSecondaryText]}>
-                  Allow access in device settings, then try the call again.
+                  Allow access in Settings, then try again.
                 </ThemedText>
                 <Button
                   title="Open Settings"
@@ -379,47 +368,28 @@ export default function CallScreen() {
                 />
               </>
             ) : null}
-            {__DEV__ && diagnostic && !permissionDenied ? (
-              <ThemedText variant="caption" style={[styles.centered, styles.callSecondaryText]}>
-                {`Diagnostic: ${diagnostic}`}
-              </ThemedText>
-            ) : null}
           </View>
         ) : null}
 
-        {transportError ? (
-          <ThemedText
-            variant="caption"
-            style={[styles.transportError, styles.callSecondaryText, { top: contentTop + 152 }]}
+        {isBusyWithAnotherPerson || currentState ? (
+          <Animated.View
+            style={[styles.bottomControls, { bottom: contentBottom }, controlsStyle]}
+            pointerEvents={controlsVisible ? 'auto' : 'none'}
           >
-            {transportError}
-          </ThemedText>
-        ) : null}
-
-        <Animated.View
-          style={[styles.bottomControls, { bottom: contentBottom }, controlsStyle]}
-          pointerEvents={controlsVisible ? 'auto' : 'none'}
-        >
-          {isBusyWithAnotherPerson ? (
-            <Button title="Back" variant="ghost" onPress={() => router.back()} style={styles.wideAction} />
-          ) : isIncoming ? (
-            <View style={styles.actions}>
-              <Button title="Accept call" onPress={() => void acceptIncoming()} style={styles.wideAction} />
-              <Button title="Reject" variant="destructive" onPress={reject} style={styles.wideAction} />
-            </View>
-          ) : isTerminal(currentState) ? (
-            <View style={styles.actions}>
-              <Button title="Done" variant="ghost" onPress={closeCall} style={styles.wideAction} />
-            </View>
-          ) : isReady ? (
-            <View style={styles.actions}>
-              <Button title="Voice call" onPress={() => startCall('voice')} style={styles.wideAction} />
-              <Button title="Video call" variant="secondary" onPress={() => startCall('video')} style={styles.wideAction} />
+            {isBusyWithAnotherPerson ? (
               <Button title="Back" variant="ghost" onPress={() => router.back()} style={styles.wideAction} />
-            </View>
-          ) : (
-            <View style={styles.actions}>
-              {currentState === 'connected' ? (
+            ) : isIncoming ? (
+              <View style={styles.actions}>
+                <Button title="Accept call" onPress={() => void acceptIncoming()} style={styles.wideAction} />
+                <Button title="Reject" variant="destructive" onPress={reject} style={styles.wideAction} />
+              </View>
+            ) : isTerminal(currentState) ? (
+              <View style={styles.actions}>
+                <Button title="Done" variant="ghost" onPress={closeCall} style={styles.wideAction} />
+              </View>
+            ) : currentState ? (
+              <View style={styles.actions}>
+                {currentState === 'connected' ? (
                 <View style={styles.controlRow}>
                   <IconButton
                     label={session?.isMuted ? 'Unmute' : 'Mute'}
@@ -475,31 +445,32 @@ export default function CallScreen() {
                     </>
                   ) : null}
                 </View>
-              ) : null}
-              {currentState === 'outgoing' || currentState === 'ringing' || currentState === 'connecting' ? (
-                <>
+                ) : null}
+                {currentState === 'outgoing' || currentState === 'ringing' || currentState === 'connecting' ? (
+                  <>
+                    <Button
+                      title={currentState === 'ringing' ? 'Cancel call' : 'Cancel'}
+                      variant="destructive"
+                      onPress={cancel}
+                      style={styles.endAction}
+                    />
+                    {currentState === 'ringing' ? (
+                      <Button title="Simulate timeout" variant="ghost" size="sm" onPress={timeout} />
+                    ) : null}
+                  </>
+                ) : (
                   <Button
-                    title={currentState === 'ringing' ? 'Cancel call' : 'Cancel'}
+                    title="End call"
                     variant="destructive"
-                    onPress={cancel}
+                    onPress={end}
+                    disabled={currentState === 'ending'}
                     style={styles.endAction}
                   />
-                  {currentState === 'ringing' ? (
-                    <Button title="Simulate timeout" variant="ghost" size="sm" onPress={timeout} />
-                  ) : null}
-                </>
-              ) : (
-                <Button
-                  title="End call"
-                  variant="destructive"
-                  onPress={end}
-                  disabled={currentState === 'ending'}
-                  style={styles.endAction}
-                />
-              )}
-            </View>
-          )}
-        </Animated.View>
+                )}
+              </View>
+            ) : null}
+          </Animated.View>
+        ) : null}
       </View>
     </View>
   );
@@ -571,18 +542,24 @@ const styles = StyleSheet.create({
     right: Spacing.lg,
     alignItems: 'center',
     gap: Spacing.xs,
-  },
-  transportError: {
-    position: 'absolute',
-    left: Spacing.lg,
-    right: Spacing.lg,
-    textAlign: 'center',
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    backgroundColor: CallColors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: CallColors.border,
   },
   bottomControls: {
     position: 'absolute',
     left: Spacing.md,
     right: Spacing.md,
     alignItems: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: Radius.lg,
+    backgroundColor: CallColors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: CallColors.border,
+    boxShadow: Shadows.floating,
   },
   actions: {
     width: '100%',
@@ -601,7 +578,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: Spacing.sm,
-    marginBottom: Spacing.sm,
+    width: '100%',
     padding: Spacing.sm,
     borderRadius: Radius.full,
     backgroundColor: CallColors.surface,
@@ -609,8 +586,10 @@ const styles = StyleSheet.create({
     borderColor: CallColors.border,
   },
   callControlButton: {
-    minWidth: 48,
-    minHeight: 48,
+    width: 56,
+    height: 56,
+    minWidth: 56,
+    minHeight: 56,
     backgroundColor: CallColors.controlBackground,
     borderColor: 'transparent',
   },

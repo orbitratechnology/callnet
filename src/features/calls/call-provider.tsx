@@ -54,7 +54,6 @@ type CallContextValue = CallController & {
   addContact(contact: ContactInput): void;
   transportMode: CallTransportMode;
   transportStatus: 'connecting' | 'connected' | 'offline';
-  transportError: string | null;
   retryConnection(): Promise<void>;
   localStreamUrl: string | null;
   remoteStreamUrl: string | null;
@@ -93,7 +92,6 @@ export function CallProvider({
   const [transportStatus, setTransportStatus] = useState<'connecting' | 'connected' | 'offline'>(
     transportMode === 'demo' ? 'connected' : 'connecting',
   );
-  const [transportError, setTransportError] = useState<string | null>(null);
   const [localStreamUrl, setLocalStreamUrl] = useState<string | null>(null);
   const [remoteStreamUrl, setRemoteStreamUrl] = useState<string | null>(null);
   const sessionRef = useRef<CallSession | null>(session);
@@ -195,7 +193,6 @@ export function CallProvider({
         setTransportStatus('connected');
       } else if (event.status === 'offline') {
         setTransportStatus('offline');
-        setTransportError('Signaling connection lost. Retry when your connection is available.');
       } else {
         setTransportStatus('connecting');
       }
@@ -283,7 +280,6 @@ export function CallProvider({
     }
 
     setTransportStatus('connecting');
-    setTransportError(null);
     let cancelled = false;
     let controller: WebRTCCallController | null = null;
     let unsubscribe: () => void = () => undefined;
@@ -302,10 +298,9 @@ export function CallProvider({
           setTransportStatus('connected');
         }
       })
-      .catch((error: unknown) => {
+      .catch(() => {
         if (!cancelled && mountedRef.current) {
           setTransportStatus('offline');
-          setTransportError(error instanceof Error ? error.message : 'Signaling connection failed.');
         }
       });
 
@@ -327,7 +322,6 @@ export function CallProvider({
     }
 
     setTransportStatus('connecting');
-    setTransportError(null);
 
     try {
       const controller = await getConnectedController();
@@ -336,10 +330,9 @@ export function CallProvider({
       if (mountedRef.current) {
         setTransportStatus('connected');
       }
-    } catch (error: unknown) {
+    } catch {
       if (mountedRef.current) {
         setTransportStatus('offline');
-        setTransportError(error instanceof Error ? error.message : 'Signaling connection failed.');
       }
     }
   };
@@ -620,7 +613,6 @@ export function CallProvider({
     addContact,
     transportMode,
     transportStatus,
-    transportError,
     retryConnection,
     localStreamUrl,
     remoteStreamUrl,

@@ -68,7 +68,7 @@ export function Avatar({ initials, photoURL, size = 'md', accessible = true, acc
 
 const styles = StyleSheet.create({
   base: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: Radius.full },
-  image: { width: '100%', height: '100%' },
+  image: StyleSheet.absoluteFill,
   sm: { width: 40, height: 40 },
   md: { width: 52, height: 52 },
   lg: { width: 96, height: 96, padding: Spacing.sm },

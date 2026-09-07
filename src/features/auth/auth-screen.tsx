@@ -10,6 +10,7 @@ import {
 import { GoogleSignInButton } from 'react-native-nitro-google-signin';
 
 import { ThemedText } from '@/components/themed-text';
+import { CallnetBrand } from '@/components/callnet-brand';
 import { Button } from '@/components/ui/button';
 import {
   Colors,
@@ -17,22 +18,12 @@ import {
   Radius,
   Shadows,
   Spacing,
-  useBrandColors,
   useThemeBackground,
 } from '@/constants/theme';
 import { isValidUsername, normalizeUsername } from '@/features/profile/profile-service';
 
 import { useAuth } from './auth-provider';
 import { getAuthErrorMessage } from './auth-service';
-
-function BrandMark() {
-  const brand = useBrandColors();
-  return (
-    <View style={[styles.brandMark, { backgroundColor: brand.accentSoft }]}>
-      <ThemedText variant="title" style={{ color: brand.accentContrast }}>C</ThemedText>
-    </View>
-  );
-}
 
 export function AuthScreen() {
   const { signInWithGoogle, signInWithEmail, createEmailAccount } = useAuth();
@@ -105,7 +96,7 @@ export function AuthScreen() {
       >
         <View style={styles.shell}>
           <View style={styles.header}>
-            <BrandMark />
+            <CallnetBrand />
             <View style={styles.intro}>
               <ThemedText variant="largeTitle">
                 {isCreateMode ? 'Create your Callnet account' : 'Welcome to Callnet'}
@@ -258,13 +249,6 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   header: { gap: Spacing.lg, paddingHorizontal: Spacing.xs },
-  brandMark: {
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Radius.full,
-  },
   intro: { gap: Spacing.sm },
   formCard: {
     gap: Spacing.md,

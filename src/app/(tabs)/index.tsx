@@ -11,13 +11,13 @@ import { PeopleSearch } from '@/components/people-search';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import {
-  Colors,
-  MaxContentWidth,
-  Radius,
-  Shadows,
-  Spacing,
-  useBrandColors,
-  useThemeBackground,
+    Colors,
+    MaxContentWidth,
+    Radius,
+    Shadows,
+    Spacing,
+    useBrandColors,
+    useThemeBackground,
 } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useCall } from '@/features/calls/call-provider';
@@ -25,7 +25,7 @@ import type { CallKind } from '@/features/calls/call-state';
 import type { DemoPerson } from '@/features/contacts/demo-people';
 import { demoPeople } from '@/features/contacts/demo-people';
 import type { RecentCall } from '@/features/recents/recent-call-repository';
-import { redactDiagnostic } from '../../../shared/diagnostics';
+import { getCallConnectionCopy } from '@/features/calls/call-messages';
 
 function formatTime(timestamp: number) {
   return new Date(timestamp).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -52,10 +52,12 @@ const RecentCallItem = memo(function RecentCallItem({
   call,
   previousTimestamp,
   onPress,
+  onStartCall,
 }: {
   call: RecentCall;
   previousTimestamp?: number;
   onPress: () => void;
+  onStartCall: (kind: CallKind) => void;
 }) {
   const showDate = previousTimestamp === undefined || getDateKey(previousTimestamp) !== getDateKey(call.timestamp);
   return (
@@ -64,6 +66,7 @@ const RecentCallItem = memo(function RecentCallItem({
       dateLabel={showDate ? formatDateLabel(call.timestamp) : undefined}
       timeLabel={formatTime(call.timestamp)}
       onPress={onPress}
+      onStartCall={onStartCall}
     />
   );
 });
@@ -81,7 +84,6 @@ function FavoritesStrip({
     <View style={styles.favoritesSection}>
       <View style={styles.sectionHeader}>
         <ThemedText variant="headline">Favorites</ThemedText>
-        <View style={styles.sectionRule} />
       </View>
       <ScrollView
         horizontal
@@ -97,7 +99,7 @@ function FavoritesStrip({
             onPress={() => onPress(person.id)}
             style={({ pressed }) => [styles.favoriteContact, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <Avatar initials={person.initials} photoURL={person.photoURL} size="lg" accessible={false} />
+            <Avatar initials={person.initials} photoURL={person.photoURL} size="md" accessible={false} />
             <ThemedText variant="caption" numberOfLines={1} style={styles.favoriteName}>{person.name}</ThemedText>
           </Pressable>
         ))}
@@ -134,13 +136,12 @@ function HomeFooter({ onIncomingCall }: { onIncomingCall: () => void }) {
       <View style={styles.footerRow}>
         <View style={styles.statusDot} />
         <View style={styles.footerCopy}>
-          <ThemedText variant="caption" tone="brand">PRIVATE BY DESIGN</ThemedText>
+          <ThemedText variant="caption" tone="brand">CALL PREVIEW</ThemedText>
           <ThemedText variant="subhead" tone="secondary" selectable>Your call history stays on this device.</ThemedText>
         </View>
       </View>
       <View style={styles.demoNote}>
-        <ThemedText variant="caption" tone="secondary">LOCAL DEMO MODE</ThemedText>
-        <ThemedText variant="subhead" tone="secondary">Exercise an incoming call flow without another device.</ThemedText>
+        <ThemedText variant="subhead" tone="secondary">See how an incoming call looks without calling someone.</ThemedText>
         <Button title="Try incoming call" variant="secondary" size="sm" onPress={onIncomingCall} />
       </View>
     </View>
@@ -148,25 +149,13 @@ function HomeFooter({ onIncomingCall }: { onIncomingCall: () => void }) {
 }
 
 function WebRTCFooter({
-  error,
   status,
   onRetry,
 }: {
-  error: string | null;
   status: 'connecting' | 'connected' | 'offline';
   onRetry: () => void;
 }) {
-  const statusLabel = status === 'connected'
-    ? 'CONNECTED'
-    : status === 'connecting'
-      ? 'CONNECTING…'
-      : 'OFFLINE';
-  const diagnostic = error ? redactDiagnostic(error) : null;
-  const statusCopy = status === 'connected'
-    ? 'Ready for secure calls with your Firebase identity.'
-    : status === 'connecting'
-      ? 'Connecting to the calling service.'
-      : 'The calling service is unavailable. Check your connection.';
+  const { label, message } = getCallConnectionCopy(status);
 
   return (
     <View style={styles.footerContent}>
@@ -174,18 +163,13 @@ function WebRTCFooter({
       <View style={styles.footerRow}>
         <View style={[styles.statusDot, status === 'connected' ? styles.statusDotOnline : styles.statusDotOffline]} />
         <View style={styles.footerCopy}>
-          <ThemedText variant="caption" tone={status === 'connected' ? 'brand' : 'secondary'}>
-            AUTHENTICATED WEBRTC · {statusLabel}
-          </ThemedText>
-          <ThemedText variant="subhead" tone="secondary" selectable>{statusCopy}</ThemedText>
-          {__DEV__ && diagnostic ? (
-            <ThemedText variant="caption" tone="secondary" selectable>{`Diagnostic: ${diagnostic}`}</ThemedText>
-          ) : null}
+          <ThemedText variant="caption" tone={status === 'connected' ? 'brand' : 'secondary'}>{label}</ThemedText>
+          <ThemedText variant="subhead" tone="secondary" selectable>{message}</ThemedText>
         </View>
       </View>
       {status !== 'connected' ? (
         <Button
-          title="Retry connection"
+          title="Try again"
           variant="secondary"
           size="sm"
           loading={status === 'connecting'}
@@ -234,7 +218,6 @@ export default function HomeScreen() {
     startOutgoing,
     transportMode,
     transportStatus,
-    transportError,
     retryConnection,
   } = useCall();
 
@@ -243,8 +226,8 @@ export default function HomeScreen() {
     router.push('/incoming');
   }, [simulateIncoming]);
 
-  const openCall = useCallback((personId: string) => {
-    router.push({ pathname: '/call', params: { personId } });
+  const openContact = useCallback((personId: string) => {
+    router.push({ pathname: '/contact/[personId]', params: { personId } });
   }, []);
   const openFavorite = useCallback((personId: string) => {
     router.push({ pathname: '/contact/[personId]', params: { personId } });
@@ -265,10 +248,11 @@ export default function HomeScreen() {
       <RecentCallItem
         call={item}
         previousTimestamp={recentCalls[index - 1]?.timestamp}
-        onPress={() => openCall(item.person.id)}
+        onPress={() => openContact(item.person.id)}
+        onStartCall={(kind) => startCall(item.person, kind)}
       />
     ),
-    [openCall, recentCalls],
+    [openContact, recentCalls, startCall],
   );
 
   return (
@@ -297,7 +281,7 @@ export default function HomeScreen() {
         ListFooterComponent={
           transportMode === 'demo'
             ? <HomeFooter onIncomingCall={startDemoIncomingCall} />
-            : <WebRTCFooter error={transportError} status={transportStatus} onRetry={() => void retryConnection()} />
+            : <WebRTCFooter status={transportStatus} onRetry={() => void retryConnection()} />
         }
       />
       <KeypadButton onPress={() => setKeypadVisible(true)} />
@@ -325,9 +309,10 @@ const styles = StyleSheet.create({
   },
   favoritesSection: { gap: Spacing.md },
   favoritesContent: { gap: Spacing.lg, paddingRight: Spacing.lg, paddingVertical: Spacing.xs },
-  favoriteContact: { width: 68, alignItems: 'center', gap: Spacing.xs },
-  favoriteName: { maxWidth: 68, textAlign: 'center' },
+  favoriteContact: { width: 72, alignItems: 'center', gap: Spacing.xs },
+  favoriteName: { maxWidth: 72, textAlign: 'center' },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  recentHeading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingTop: Spacing.sm },
   sectionRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: Colors.separator },
   emptyState: {
     gap: Spacing.xs,

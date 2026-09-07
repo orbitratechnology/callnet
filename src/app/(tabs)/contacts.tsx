@@ -1,11 +1,13 @@
 import { router } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { useDeferredValue, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PersonRow } from '@/components/person-row';
 import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
-import { Colors, MaxContentWidth, Radius, Spacing, useBrandColors, useThemeBackground } from '@/constants/theme';
+import { SearchBar } from '@/components/ui/search-bar';
+import { Colors, MaxContentWidth, Radius, Shadows, Spacing, useBrandColors, useThemeBackground } from '@/constants/theme';
 import { useCall } from '@/features/calls/call-provider';
 import type { DemoPerson } from '@/features/contacts/demo-people';
 
@@ -58,16 +60,16 @@ function ContactsHeader({
 }) {
   return (
     <View style={styles.header}>
-      <TextInput
-        accessibilityLabel="Search contacts"
-        placeholder="Search name or @username"
-        placeholderTextColor={Colors.secondaryLabel as string}
+      <SearchBar
         value={query}
         onChangeText={onQueryChange}
+        onClear={() => onQueryChange('')}
+        placeholder="Search contacts"
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
-        style={styles.searchInput}
+        accessibilityLabel="Search contacts by name or username"
+        accessibilityRole="search"
       />
       <View style={styles.filters} accessibilityRole="tablist">
         <FilterChip
@@ -101,6 +103,8 @@ function ContactsEmptyState({ hasQuery, isRecent }: { hasQuery: boolean; isRecen
 export default function ContactsScreen() {
   const { contacts, recentCalls } = useCall();
   const backgroundColor = useThemeBackground();
+  const brand = useBrandColors();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ContactFilter>('all');
   const deferredQuery = useDeferredValue(query);
@@ -152,13 +156,20 @@ export default function ContactsScreen() {
         ListEmptyComponent={
           <ContactsEmptyState hasQuery={Boolean(query.trim())} isRecent={filter === 'recent'} />
         }
-        ListFooterComponent={
-          <View style={styles.footer}>
-            <Button title="Add contact" variant="secondary" size="md" onPress={() => router.push('/select-person')} />
-          </View>
-        }
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 104 }]}
       />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Add contact"
+        accessibilityHint="Search for a Callnet user to add"
+        onPress={() => router.push('/select-person')}
+        style={({ pressed }) => [
+          styles.fab,
+          { backgroundColor: brand.accent, bottom: insets.bottom + 88, opacity: pressed ? 0.78 : 1 },
+        ]}
+      >
+        <SymbolView name={{ ios: 'plus', android: 'add', web: 'add' }} size={28} tintColor={brand.onAccent} />
+      </Pressable>
     </View>
   );
 }
@@ -177,16 +188,6 @@ const styles = StyleSheet.create({
   },
   headingRow: { flexDirection: 'row', alignItems: 'center' },
   headingCopy: { gap: Spacing.xs },
-  searchInput: {
-    minHeight: 48,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.separator,
-    backgroundColor: Colors.secondaryBackground,
-    color: Colors.label as string,
-    fontSize: 16,
-  },
   filters: { flexDirection: 'row', gap: Spacing.sm },
   filterChip: {
     minHeight: 40,
@@ -204,5 +205,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.systemBackground,
   },
   emptyState: { gap: Spacing.xs, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.xl },
-  footer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
+  fab: {
+    position: 'absolute',
+    right: Spacing.lg,
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.full,
+    boxShadow: Shadows.floating,
+  },
 });

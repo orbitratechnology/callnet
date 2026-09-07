@@ -18,8 +18,8 @@ export const Colors = {
     default: '#D6D6D6',
   })!,
   systemBackground: Platform.select({
-    ios: '#000000',
-    android: '#000000',
+    ios: Color.ios.systemBackground,
+    android: Color.android.dynamic.surface,
     default: '#FFFFFF',
   })!,
   secondaryBackground: Platform.select({
@@ -59,7 +59,7 @@ export function useBrandColors() {
 }
 
 export function useThemeBackground() {
-  return useColorScheme() === 'dark' ? '#000000' : Colors.systemBackground;
+  return useColorScheme() === 'dark' ? '#000000' : '#FFFFFF';
 }
 
 export const Fonts = Platform.select({
