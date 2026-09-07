@@ -1,43 +1,20 @@
-import { Color } from 'expo-router';
-import { Platform, useColorScheme, type TextStyle } from 'react-native';
+import { Platform, type TextStyle } from 'react-native';
 
 export const Colors = {
-  label: Platform.select({
-    ios: Color.ios.label,
-    android: Color.android.dynamic.onSurface,
-    default: '#000000',
-  })!,
-  secondaryLabel: Platform.select({
-    ios: Color.ios.secondaryLabel,
-    android: Color.android.dynamic.onSurfaceVariant,
-    default: '#666666',
-  })!,
-  separator: Platform.select({
-    ios: Color.ios.separator,
-    android: Color.android.dynamic.outlineVariant,
-    default: '#D6D6D6',
-  })!,
-  systemBackground: Platform.select({
-    ios: Color.ios.systemBackground,
-    android: Color.android.dynamic.surface,
-    default: '#FFFFFF',
-  })!,
-  secondaryBackground: Platform.select({
-    ios: Color.ios.secondarySystemBackground,
-    android: Color.android.dynamic.surface,
-    default: '#FFFFFF',
-  })!,
-  destructive: Platform.select({
-    ios: Color.ios.systemRed,
-    android: Color.android.dynamic.error,
-    default: '#C7362F',
-  })!,
+  label: '#FFFFFF',
+  secondaryLabel: '#A5A5A5',
+  separator: '#2A2A2A',
+  systemBackground: '#000000',
+  secondaryBackground: '#161616',
+  destructive: '#FF544D',
   success: '#46A982',
 } as const;
 
 export const BrandColors = {
-  light: { accent: '#000000', accentSoft: '#F1F1F1', accentContrast: '#000000', onAccent: '#FFFFFF' },
-  dark: { accent: '#FFFFFF', accentSoft: '#2A2A2A', accentContrast: '#FFFFFF', onAccent: '#000000' },
+  accent: '#FFFFFF',
+  accentSoft: '#2A2A2A',
+  accentContrast: '#FFFFFF',
+  onAccent: '#000000',
 } as const;
 
 export const CallColors = {
@@ -54,12 +31,11 @@ export const CallColors = {
 } as const;
 
 export function useBrandColors() {
-  const scheme = useColorScheme();
-  return BrandColors[scheme === 'dark' ? 'dark' : 'light'];
+  return BrandColors;
 }
 
 export function useThemeBackground() {
-  return useColorScheme() === 'dark' ? '#000000' : '#FFFFFF';
+  return Colors.systemBackground;
 }
 
 export const Fonts = Platform.select({

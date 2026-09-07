@@ -1,8 +1,10 @@
 import { getFirebaseAccessToken } from './push-dispatch';
 
-const MIN_QUERY_LENGTH = 2;
-const MAX_QUERY_LENGTH = 120;
-const MAX_RESULTS = 10;
+const MAX_CONTACTS = 500;
+const MAX_TOKENS_PER_CONTACT = 32;
+const MAX_UNIQUE_TOKENS = 1200;
+const MAX_RESULTS_PER_QUERY = 100;
+const MAX_QUERY_TOKENS = 30;
 const MAX_RESPONSE_BYTES = 256 * 1024;
 
 type DirectoryEnvironment = {
@@ -16,6 +18,11 @@ type FirestoreArrayValue = { values?: FirestoreStringValue[] };
 type FirestoreField = FirestoreStringValue & { arrayValue?: FirestoreArrayValue };
 type FirestoreDocument = { fields?: Record<string, FirestoreField> };
 
+export type DirectoryContactInput = {
+  contactId: string;
+  tokens: string[];
+};
+
 export type DirectoryProfile = {
   uid: string;
   username: string;
@@ -23,28 +30,10 @@ export type DirectoryProfile = {
   photoURL: string | null;
 };
 
-function normalizePhoneNumber(value: string) {
-  return value.trim().replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
-}
-
-export function normalizeDirectorySearchValue(value: string) {
-  const trimmed = value.trim().toLowerCase();
-  if (trimmed.startsWith('@')) {
-    return trimmed.slice(1);
-  }
-  if (trimmed.startsWith('+') || /^[\d\s().-]+$/.test(trimmed)) {
-    return normalizePhoneNumber(trimmed);
-  }
-  return trimmed.replace(/\s+/g, ' ');
-}
-
-async function hashSearchValue(value: string) {
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(normalizeDirectorySearchValue(value)),
-  );
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
+export type DirectoryContactMatch = {
+  contactId: string;
+  profile: DirectoryProfile;
+};
 
 function getStringField(fields: Record<string, FirestoreField> | undefined, name: string) {
   const value = fields?.[name]?.stringValue;
@@ -66,64 +55,114 @@ async function readResponseWithinLimit(response: Response) {
   return JSON.parse(text) as unknown;
 }
 
-export async function searchDirectory(
+function chunk<T>(values: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
+function readProfile(item: unknown, requesterUid: string) {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+  const document = (item as { document?: FirestoreDocument }).document;
+  const fields = document?.fields;
+  const uid = getStringField(fields, 'uid');
+  const username = getStringField(fields, 'username');
+  const displayName = getStringField(fields, 'displayName');
+  if (!uid || uid === requesterUid || !username || !displayName) {
+    return null;
+  }
+
+  const photoURLValue = fields?.photoURL?.stringValue;
+  const photoURL = typeof photoURLValue === 'string' ? photoURLValue : null;
+  return {
+    profile: { uid, username, displayName, photoURL } satisfies DirectoryProfile,
+    tokens: new Set(getSearchTokens(fields)),
+  };
+}
+
+export async function matchDirectoryContacts(
   env: DirectoryEnvironment,
-  query: string,
+  contacts: DirectoryContactInput[],
   requesterUid: string,
-): Promise<DirectoryProfile[]> {
-  const normalizedQuery = normalizeDirectorySearchValue(query);
-  if (normalizedQuery.length < MIN_QUERY_LENGTH || normalizedQuery.length > MAX_QUERY_LENGTH) {
+): Promise<DirectoryContactMatch[]> {
+  const boundedContacts = contacts
+    .slice(0, MAX_CONTACTS)
+    .map((contact) => ({
+      contactId: contact.contactId.trim().slice(0, 160),
+      tokens: [...new Set(contact.tokens)].filter((token) => /^[a-f0-9]{64}$/i.test(token)).slice(0, MAX_TOKENS_PER_CONTACT),
+    }))
+    .filter((contact) => contact.contactId.length > 0 && contact.tokens.length > 0);
+
+  const tokenToContactIds = new Map<string, Set<string>>();
+  for (const contact of boundedContacts) {
+    for (const token of contact.tokens) {
+      const contactIds = tokenToContactIds.get(token) ?? new Set<string>();
+      contactIds.add(contact.contactId);
+      tokenToContactIds.set(token, contactIds);
+    }
+  }
+
+  const tokens = [...tokenToContactIds.keys()].slice(0, MAX_UNIQUE_TOKENS);
+  if (tokens.length === 0) {
     return [];
   }
 
   const accessToken = await getFirebaseAccessToken(env);
-  const response = await fetch(
-    `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(env.FIREBASE_PROJECT_ID)}/databases/(default)/documents:runQuery`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: 'userSearch' }],
-          where: {
-            fieldFilter: {
-              field: { fieldPath: 'searchTokens' },
-              op: 'ARRAY_CONTAINS',
-              value: { stringValue: await hashSearchValue(normalizedQuery) },
-            },
-          },
-          limit: MAX_RESULTS,
+  const queryUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(env.FIREBASE_PROJECT_ID)}/databases/(default)/documents:runQuery`;
+  const responses = await Promise.all(
+    chunk(tokens, MAX_QUERY_TOKENS).map(async (tokenGroup) => {
+      const response = await fetch(queryUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
         },
-      }),
-    },
+        body: JSON.stringify({
+          structuredQuery: {
+            from: [{ collectionId: 'userSearch' }],
+            where: {
+              fieldFilter: {
+                field: { fieldPath: 'searchTokens' },
+                op: 'ARRAY_CONTAINS_ANY',
+                value: { arrayValue: { values: tokenGroup.map((token) => ({ stringValue: token })) } },
+              },
+            },
+            limit: MAX_RESULTS_PER_QUERY,
+          },
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`directory-match-failed-${response.status}`);
+      }
+      return readResponseWithinLimit(response);
+    }),
   );
-  if (!response.ok) {
-    throw new Error(`directory-search-failed-${response.status}`);
+
+  const matches = new Map<string, DirectoryContactMatch>();
+  for (const response of responses) {
+    if (!Array.isArray(response)) {
+      continue;
+    }
+    for (const item of response) {
+      const parsed = readProfile(item, requesterUid);
+      if (!parsed) {
+        continue;
+      }
+      for (const token of tokens) {
+        if (!parsed.tokens.has(token)) {
+          continue;
+        }
+        for (const contactId of tokenToContactIds.get(token) ?? []) {
+          const match = { contactId, profile: parsed.profile } satisfies DirectoryContactMatch;
+          matches.set(`${contactId}:${parsed.profile.uid}`, match);
+        }
+      }
+    }
   }
 
-  const payload = await readResponseWithinLimit(response);
-  if (!Array.isArray(payload)) {
-    throw new Error('directory-response-invalid');
-  }
-
-  return payload.flatMap((item) => {
-    if (!item || typeof item !== 'object') {
-      return [];
-    }
-    const document = (item as { document?: FirestoreDocument }).document;
-    const fields = document?.fields;
-    const uid = getStringField(fields, 'uid');
-    const username = getStringField(fields, 'username');
-    const displayName = getStringField(fields, 'displayName');
-    if (!uid || uid === requesterUid || !username || !displayName || getSearchTokens(fields).length === 0) {
-      return [];
-    }
-
-    const photoURLValue = fields?.photoURL?.stringValue;
-    const photoURL = typeof photoURLValue === 'string' ? photoURLValue : null;
-    return [{ uid, username, displayName, photoURL } satisfies DirectoryProfile];
-  });
+  return [...matches.values()].slice(0, MAX_CONTACTS);
 }

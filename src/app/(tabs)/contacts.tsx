@@ -50,13 +50,11 @@ function ContactsHeader({
   onQueryChange,
   filter,
   onFilterChange,
-  count,
 }: {
   query: string;
   onQueryChange: (value: string) => void;
   filter: ContactFilter;
   onFilterChange: (value: ContactFilter) => void;
-  count: number;
 }) {
   return (
     <View style={styles.header}>
@@ -68,7 +66,7 @@ function ContactsHeader({
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
-        accessibilityLabel="Search contacts by name or username"
+        accessibilityLabel="Search saved contacts by name, phone, or email"
         accessibilityRole="search"
       />
       <View style={styles.filters} accessibilityRole="tablist">
@@ -91,10 +89,10 @@ function ContactsEmptyState({ hasQuery, isRecent }: { hasQuery: boolean; isRecen
   return (
     <View style={styles.emptyState}>
       <ThemedText variant="headline">
-        {hasQuery || isRecent ? 'No contacts match your search.' : 'Add someone using their Callnet username.'}
+        {hasQuery ? 'No saved contacts match that search.' : isRecent ? 'No recent contacts yet.' : 'No contacts to add yet.'}
       </ThemedText>
       <ThemedText variant="subhead" tone="secondary">
-        {hasQuery || isRecent ? 'Add someone using their Callnet username.' : 'No contacts match your search.'}
+        {hasQuery ? 'Try a different name, phone number, or email.' : isRecent ? 'People you call will appear here.' : 'People from your phone will appear here when they join Callnet.'}
       </ThemedText>
     </View>
   );
@@ -119,7 +117,7 @@ export default function ContactsScreen() {
       if (filter === 'recent' && !recentContactIds.has(person.id)) return false;
       if (!normalizedQuery) return true;
 
-      return [person.name, person.handle, person.identityId]
+      return [person.name, person.email ?? '', person.phoneNumber ?? '']
         .some((value) => value.toLowerCase().includes(normalizedQuery));
     });
   }, [contacts, deferredQuery, filter, recentContactIds]);
@@ -150,7 +148,6 @@ export default function ContactsScreen() {
             onQueryChange={setQuery}
             filter={filter}
             onFilterChange={setFilter}
-            count={visibleContacts.length}
           />
         }
         ListEmptyComponent={
@@ -161,7 +158,7 @@ export default function ContactsScreen() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Add contact"
-        accessibilityHint="Search for a Callnet user to add"
+        accessibilityHint="Import people from your device contacts"
         onPress={() => router.push('/select-person')}
         style={({ pressed }) => [
           styles.fab,

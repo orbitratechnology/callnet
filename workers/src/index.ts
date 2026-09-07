@@ -4,7 +4,7 @@ import { getFirebaseTokenFromSubprotocolHeader, SIGNALING_SUBPROTOCOL } from './
 import { UserSession } from './user-session';
 import { fetchMeteredIceServers } from './turn-credentials';
 import { redactDiagnostic } from '../../shared/diagnostics';
-import { searchDirectory } from './directory';
+import { matchDirectoryContacts, type DirectoryContactInput } from './directory';
 
 export { CallSession, UserSession };
 
@@ -83,7 +83,7 @@ export default {
       }
     }
 
-    if (request.method === 'GET' && url.pathname === '/directory/search') {
+    if (request.method === 'POST' && url.pathname === '/contacts/match') {
       const authorization = request.headers.get('Authorization');
       const token = authorization?.startsWith('Bearer ')
         ? authorization.slice('Bearer '.length).trim()
@@ -100,11 +100,33 @@ export default {
       }
 
       try {
-        const results = await searchDirectory(env, url.searchParams.get('q') ?? '', uid);
-        return Response.json({ results }, { headers: { 'Cache-Control': 'no-store' } });
+        const bodyText = await request.text();
+        if (new TextEncoder().encode(bodyText).byteLength > 256 * 1024) {
+          return new Response('Request is too large.', { status: 413, headers: { 'Cache-Control': 'no-store' } });
+        }
+        const parsedBody: unknown = JSON.parse(bodyText);
+        if (!parsedBody || typeof parsedBody !== 'object') {
+          return new Response('Invalid contacts request.', { status: 400, headers: { 'Cache-Control': 'no-store' } });
+        }
+        const rawContacts = (parsedBody as { contacts?: unknown }).contacts;
+        if (!Array.isArray(rawContacts)) {
+          return new Response('Invalid contacts request.', { status: 400, headers: { 'Cache-Control': 'no-store' } });
+        }
+        const contacts: DirectoryContactInput[] = rawContacts.flatMap((contact) => {
+              if (!contact || typeof contact !== 'object') return [];
+              const contactId = (contact as { contactId?: unknown }).contactId;
+              const tokens = (contact as { tokens?: unknown }).tokens;
+              if (typeof contactId !== 'string' || !Array.isArray(tokens)) return [];
+              return [{
+                contactId,
+                tokens: tokens.filter((token): token is string => typeof token === 'string'),
+              }];
+            });
+        const matches = await matchDirectoryContacts(env, contacts, uid);
+        return Response.json({ matches }, { headers: { 'Cache-Control': 'no-store' } });
       } catch (error) {
-        console.warn(JSON.stringify({ event: 'directory_search_failed', reason: redactDiagnostic(error, 96) }));
-        return new Response('Directory search is unavailable.', {
+        console.warn(JSON.stringify({ event: 'contact_match_failed', reason: redactDiagnostic(error, 96) }));
+        return new Response('Contacts are unavailable.', {
           status: 503,
           headers: { 'Cache-Control': 'no-store' },
         });

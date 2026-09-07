@@ -27,12 +27,12 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
   },
   icon: {
-    width: 34,
-    height: 34,
+    width: 46,
+    height: 46,
     borderRadius: Radius.sm,
     backgroundColor: '#000000',
   },
   wordmark: { color: Colors.label },
   compactBrand: { width: 44, justifyContent: 'center' },
-  compactIcon: { width: 32, height: 32 },
+  compactIcon: { width: 40, height: 40 },
 });

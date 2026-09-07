@@ -19,9 +19,8 @@ export type UserProfile = {
   updatedAt?: unknown;
 };
 
-const DIRECTORY_SEARCH_MIN_LENGTH = 2;
-const DIRECTORY_SEARCH_MAX_LENGTH = 120;
-const DIRECTORY_SEARCH_PATH = '/directory/search';
+const CONTACT_MATCH_PATH = '/contacts/match';
+const CONTACT_MATCH_MAX = 500;
 
 const USERNAME_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{1,28}[a-z0-9])?$/;
 
@@ -45,7 +44,7 @@ export function normalizePhoneNumber(value: string) {
   return value.trim().replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
 }
 
-export function normalizeDirectorySearchValue(value: string) {
+export function normalizeContactIdentifier(value: string) {
   const trimmed = value.trim().toLowerCase();
   if (trimmed.startsWith('@')) {
     return trimmed.slice(1);
@@ -57,18 +56,18 @@ export function normalizeDirectorySearchValue(value: string) {
 }
 
 function getPrefixValues(value: string) {
-  const normalized = normalizeDirectorySearchValue(value);
-  if (normalized.length < DIRECTORY_SEARCH_MIN_LENGTH) {
+  const normalized = normalizeContactIdentifier(value);
+  if (normalized.length < 2) {
     return [];
   }
 
   const values = new Set<string>();
-  for (let length = DIRECTORY_SEARCH_MIN_LENGTH; length <= normalized.length; length += 1) {
+  for (let length = 2; length <= normalized.length; length += 1) {
     values.add(normalized.slice(0, length));
   }
 
   normalized.split(' ').forEach((word) => {
-    for (let length = DIRECTORY_SEARCH_MIN_LENGTH; length <= word.length; length += 1) {
+    for (let length = 2; length <= word.length; length += 1) {
       values.add(word.slice(0, length));
     }
   });
@@ -77,8 +76,8 @@ function getPrefixValues(value: string) {
 }
 
 async function createDirectorySearchTokens(values: string[]) {
-  const normalizedValues = [...new Set(values.map(normalizeDirectorySearchValue))]
-    .filter((value) => value.length >= DIRECTORY_SEARCH_MIN_LENGTH && value.length <= DIRECTORY_SEARCH_MAX_LENGTH);
+  const normalizedValues = [...new Set(values.map(normalizeContactIdentifier))]
+    .filter((value) => value.length >= 2 && value.length <= 120);
   return Promise.all(normalizedValues.map((value) => digestStringAsync(CryptoDigestAlgorithm.SHA256, value)));
 }
 
@@ -237,56 +236,61 @@ export async function getUserProfile(uid: string) {
   return snapshot.exists() ? profileFromData(snapshot.data()) : null;
 }
 
-export async function findUserProfileByUsername(value: string) {
-  const username = normalizeUsername(value);
-  if (!isValidUsername(username)) {
-    return null;
-  }
+export type ContactMatchRequest = {
+  contactId: string;
+  tokens: string[];
+};
 
-  const usernameSnapshot = await getDoc(doc(firebaseDb, 'usernames', username));
-  const uid = usernameSnapshot.data()?.uid;
-  if (typeof uid !== 'string') {
-    return null;
-  }
+export type ContactMatch = {
+  contactId: string;
+  profile: UserProfile;
+};
 
-  const profileSnapshot = await getDoc(doc(firebaseDb, 'users', uid));
-  return profileSnapshot.exists() ? profileFromData(profileSnapshot.data()) : null;
-}
-
-export async function searchUserProfiles(value: string, idToken: string) {
-  const query = value.trim();
-  if (query.length < DIRECTORY_SEARCH_MIN_LENGTH || query.length > DIRECTORY_SEARCH_MAX_LENGTH) {
+export async function matchDeviceContacts(contacts: ContactMatchRequest[], idToken: string): Promise<ContactMatch[]> {
+  const boundedContacts = contacts
+    .slice(0, CONTACT_MATCH_MAX)
+    .map((contact) => ({
+      contactId: contact.contactId.trim().slice(0, 160),
+      tokens: [...new Set(contact.tokens)].filter((token) => /^[a-f0-9]{64}$/i.test(token)).slice(0, 32),
+    }))
+    .filter((contact) => contact.contactId.length > 0 && contact.tokens.length > 0);
+  if (boundedContacts.length === 0) {
     return [];
   }
 
   const configuredUrl = process.env.EXPO_PUBLIC_SIGNALING_URL?.trim();
   if (!configuredUrl) {
-    throw new Error('Callnet search is not configured.');
+    throw new Error('Callnet contacts are not configured.');
   }
 
   const url = new URL(configuredUrl);
   url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:';
-  url.pathname = DIRECTORY_SEARCH_PATH;
+  url.pathname = CONTACT_MATCH_PATH;
   url.search = '';
-  url.searchParams.set('q', query);
 
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${idToken}` },
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ contacts: boundedContacts }),
   });
   if (!response.ok) {
-    throw new Error(`Callnet search failed with status ${response.status}.`);
+    throw new Error(`Callnet contacts failed with status ${response.status}.`);
   }
 
   const payload: unknown = await response.json();
-  if (!payload || typeof payload !== 'object' || !Array.isArray((payload as { results?: unknown }).results)) {
-    throw new Error('Callnet search returned an invalid response.');
+  if (!payload || typeof payload !== 'object' || !Array.isArray((payload as { matches?: unknown }).matches)) {
+    throw new Error('Callnet contacts returned an invalid response.');
   }
 
-  return (payload as { results: unknown[] }).results.flatMap((result) => {
-    if (!result || typeof result !== 'object') {
+  return (payload as { matches: unknown[] }).matches.flatMap((match) => {
+    if (!match || typeof match !== 'object') {
       return [];
     }
-    const profile = profileFromData(result as DocumentData);
-    return profile ? [profile] : [];
+    const contactId = (match as { contactId?: unknown }).contactId;
+    const profile = profileFromData((match as { profile?: DocumentData }).profile);
+    return typeof contactId === 'string' && profile ? [{ contactId, profile }] : [];
   });
 }

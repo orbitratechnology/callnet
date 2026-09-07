@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { CallLogRow } from '@/components/call-log-row';
 import { KeypadSheet } from '@/components/keypad-sheet';
-import { PeopleSearch } from '@/components/people-search';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +18,6 @@ import {
     useBrandColors,
     useThemeBackground,
 } from '@/constants/theme';
-import { useAuth } from '@/features/auth/auth-provider';
 import { useCall } from '@/features/calls/call-provider';
 import type { CallKind } from '@/features/calls/call-state';
 import type { DemoPerson } from '@/features/contacts/demo-people';
@@ -109,21 +107,14 @@ function FavoritesStrip({
 }
 
 function HomeHeader({
-  contacts,
   favoriteContacts,
-  getIdToken,
-  onStartCall,
   onPressFavorite,
 }: {
-  contacts: DemoPerson[];
   favoriteContacts: DemoPerson[];
-  getIdToken: () => Promise<string>;
-  onStartCall: (person: DemoPerson, kind: CallKind) => void;
   onPressFavorite: (personId: string) => void;
 }) {
   return (
     <View style={styles.headerContent}>
-      <PeopleSearch contacts={contacts} getIdToken={getIdToken} onStartCall={onStartCall} />
       <FavoritesStrip contacts={favoriteContacts} onPress={onPressFavorite} />
     </View>
   );
@@ -209,7 +200,6 @@ function KeypadButton({ onPress }: { onPress: () => void }) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const backgroundColor = useThemeBackground();
-  const { getIdToken } = useAuth();
   const [keypadVisible, setKeypadVisible] = useState(false);
   const {
     contacts,
@@ -265,10 +255,7 @@ export default function HomeScreen() {
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 120 }]}
         ListHeaderComponent={
           <HomeHeader
-            contacts={contacts}
             favoriteContacts={favoriteContacts}
-            getIdToken={getIdToken}
-            onStartCall={startCall}
             onPressFavorite={openFavorite}
           />
         }
@@ -288,7 +275,6 @@ export default function HomeScreen() {
       <KeypadSheet
         visible={keypadVisible}
         contacts={contacts}
-        getIdToken={getIdToken}
         onClose={() => setKeypadVisible(false)}
         onStartCall={startCall}
       />

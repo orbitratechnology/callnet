@@ -55,8 +55,8 @@ export default function ContactProfileScreen() {
     return (
       <View style={[styles.missingScreen, { backgroundColor }]}>
         <Stack.Screen options={{ title: 'Contact' }} />
-        <ThemedText variant="title">Contact not found</ThemedText>
-        <ThemedText variant="body" tone="secondary">This contact is no longer available.</ThemedText>
+        <ThemedText variant="title">Contact unavailable</ThemedText>
+        <ThemedText variant="body" tone="secondary">This contact is no longer in your saved contacts.</ThemedText>
         <Button title="Back" variant="secondary" onPress={() => router.back()} />
       </View>
     );
@@ -92,6 +92,18 @@ export default function ContactProfileScreen() {
 
       <View style={styles.infoCard}>
         <ContactInfoRow label="Username" value={person.handle} />
+        {person.email ? (
+          <>
+            <View style={styles.separator} />
+            <ContactInfoRow label="Email" value={person.email} />
+          </>
+        ) : null}
+        {person.phoneNumber ? (
+          <>
+            <View style={styles.separator} />
+            <ContactInfoRow label="Phone" value={person.phoneNumber} />
+          </>
+        ) : null}
         <View style={styles.separator} />
         <ContactInfoRow label="Connection" value="Available for private calls" />
       </View>

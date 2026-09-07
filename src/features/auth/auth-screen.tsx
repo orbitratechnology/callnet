@@ -4,7 +4,6 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
-  useColorScheme,
   View,
 } from 'react-native';
 import { GoogleSignInButton } from 'react-native-nitro-google-signin';
@@ -27,7 +26,6 @@ import { getAuthErrorMessage } from './auth-service';
 
 export function AuthScreen() {
   const { signInWithGoogle, signInWithEmail, createEmailAccount } = useAuth();
-  const colorScheme = useColorScheme();
   const backgroundColor = useThemeBackground();
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [displayName, setDisplayName] = useState('');
@@ -103,7 +101,7 @@ export function AuthScreen() {
               </ThemedText>
               <ThemedText variant="body" tone="secondary" selectable>
                 {isCreateMode
-                  ? 'Choose a simple identity so people can find you and call you.'
+                  ? 'Choose a simple identity so your contacts know it’s you.'
                   : 'Private calls with the people you know, across your devices.'}
               </ThemedText>
             </View>
@@ -122,7 +120,7 @@ export function AuthScreen() {
             ) : (
               <GoogleSignInButton
                 signInBehavior="none"
-                colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
+                colorScheme="dark"
                 size="wide"
                 contentAlignment="center"
                 loading={isGoogleSubmitting}

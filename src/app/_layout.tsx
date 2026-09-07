@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router/stack';
 import { StyleSheet, View } from 'react-native';
 
+import { NetworkStatusBanner } from '@/components/network-status-banner';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, useThemeBackground } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/features/auth/auth-provider';
@@ -57,6 +58,7 @@ function RootContent() {
 export default function RootLayout() {
   return (
     <AppThemeProvider>
+      <NetworkStatusBanner />
       <AuthProvider>
         <RootContent />
       </AuthProvider>

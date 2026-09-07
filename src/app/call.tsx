@@ -357,7 +357,9 @@ export default function CallScreen() {
             {permissionDenied ? (
               <>
                 <ThemedText variant="caption" style={[styles.centered, styles.callSecondaryText]}>
-                  Allow access in Settings, then try again.
+                  {session?.kind === 'video'
+                    ? 'Allow camera and microphone access in Settings, then try the call again.'
+                    : 'Allow microphone access in Settings, then try the call again.'}
                 </ThemedText>
                 <Button
                   title="Open Settings"

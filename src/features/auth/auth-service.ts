@@ -89,7 +89,7 @@ export function getAuthErrorMessage(error: unknown) {
     return 'Too many attempts. Wait a moment and try again.';
   }
   if (code.includes('network-request-failed') || code.includes('unavailable') || code.includes('deadline-exceeded')) {
-    return 'No internet connection. Check your connection and try again.';
+    return 'You’re offline. Reconnect to the internet and try again.';
   }
   if (code.includes('user-disabled')) {
     return 'This account is not available.';

@@ -4,24 +4,24 @@ export function getCallFailureMessage(reason: string | undefined, kind: CallKind
   const value = reason?.toLowerCase() ?? '';
 
   if (value.includes('peer-busy')) {
-    return 'Contact is already on another call.';
+    return 'They’re on another call right now.';
   }
   if (value.includes('peer-offline')) {
-    return 'Contact is offline.';
+    return 'They’re not available right now.';
   }
   if (value.includes('timed-out') || value.includes('timeout')) {
-    return 'No answer.';
+    return 'No answer. Try again later.';
   }
   if (value.includes('rejected')) {
-    return 'Call declined.';
+    return 'They declined the call.';
   }
   if (value.includes('cancelled') || value.includes('canceled')) {
     return 'Call cancelled.';
   }
   if (value.includes('permission-denied')) {
     return kind === 'video'
-      ? 'Camera and microphone access is needed for video calls.'
-      : 'Microphone access is needed for voice calls.';
+      ? 'Allow camera and microphone access to make a video call.'
+      : 'Allow microphone access to make a voice call.';
   }
   if (
     value.includes('network') ||
@@ -32,10 +32,10 @@ export function getCallFailureMessage(reason: string | undefined, kind: CallKind
     value.includes('reconnect') ||
     value.includes('not-connected')
   ) {
-    return 'No internet connection. Check your connection and try again.';
+    return 'You’re offline. Reconnect to the internet and try again.';
   }
 
-  return 'The call could not connect. Please try again.';
+  return 'We couldn’t connect the call. Please try again.';
 }
 
 export function getCallConnectionCopy(status: 'connecting' | 'connected' | 'offline') {
@@ -45,5 +45,5 @@ export function getCallConnectionCopy(status: 'connecting' | 'connected' | 'offl
   if (status === 'connecting') {
     return { label: 'Getting ready', message: 'Your calls will be ready in a moment.' };
   }
-  return { label: 'Calls unavailable', message: 'Check your internet connection and try again.' };
+  return { label: 'No connection', message: 'Reconnect to the internet to make calls.' };
 }

@@ -1,7 +1,6 @@
 import { Stack } from 'expo-router';
-import { Host, Switch as NativeSwitch } from '@expo/ui';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
@@ -9,11 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Colors, MaxContentWidth, Radius, Shadows, Spacing } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-provider';
 import { getUserProfile, type UserProfile } from '@/features/profile/profile-service';
-import { useAppTheme } from '@/features/theme/theme-provider';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
-  const { mode, toggleMode } = useAppTheme();
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
@@ -49,36 +46,8 @@ export default function ProfileScreen() {
             Your account works across your devices.
           </ThemedText>
           <ThemedText variant="caption" tone="secondary">
-            Share your @username so people can find you.
+            Your username helps people recognize you when you connect with them.
           </ThemedText>
-
-          <View style={styles.section}>
-            <ThemedText variant="caption" tone="brand">APPEARANCE</ThemedText>
-            <Pressable
-              accessibilityRole="switch"
-              accessibilityLabel="Dark theme"
-              accessibilityHint="Toggle dark theme"
-              accessibilityState={{ checked: mode === 'dark' }}
-              onPress={toggleMode}
-              style={({ pressed }) => [styles.themeRow, { opacity: pressed ? 0.7 : 1 }]}
-            >
-              <View style={styles.themeCopy}>
-                <ThemedText variant="headline">Dark theme</ThemedText>
-                <ThemedText variant="subhead" tone="secondary">
-                  {mode === 'dark' ? 'On' : 'Off'}
-                </ThemedText>
-              </View>
-              <Host matchContents colorScheme={mode} style={styles.nativeSwitch}>
-                <NativeSwitch
-                  value={mode === 'dark'}
-                  onValueChange={(value) => {
-                    if (value !== (mode === 'dark')) toggleMode();
-                  }}
-                  testID="theme-switch"
-                />
-              </Host>
-            </Pressable>
-          </View>
 
           <View style={styles.section}>
             <ThemedText variant="caption" tone="brand">PRIVACY</ThemedText>
@@ -120,19 +89,6 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingTop: Spacing.sm,
   },
-  themeRow: {
-    minHeight: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.secondaryBackground,
-    boxShadow: Shadows.card,
-  },
-  themeCopy: { flex: 1, gap: Spacing.xs },
-  nativeSwitch: { minWidth: 56, minHeight: 40, alignItems: 'flex-end', justifyContent: 'center' },
   privacyList: {
     overflow: 'hidden',
     borderRadius: Radius.md,

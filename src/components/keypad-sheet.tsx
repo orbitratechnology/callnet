@@ -1,6 +1,6 @@
 import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, Share, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -16,13 +16,8 @@ import {
   useThemeBackground,
 } from '@/constants/theme';
 import type { DemoPerson } from '@/features/contacts/demo-people';
-import { getInitials } from '@/features/contacts/demo-people';
 import type { CallKind } from '@/features/calls/call-state';
-import {
-  normalizeDirectorySearchValue,
-  searchUserProfiles,
-  type UserProfile,
-} from '@/features/profile/profile-service';
+import { normalizeContactIdentifier } from '@/features/profile/profile-service';
 
 const MAX_DIGITS = 20;
 
@@ -43,18 +38,6 @@ const KEYS: ReadonlyArray<{ value: string; letters?: string }> = [
 
 const KEY_ROWS = [KEYS.slice(0, 3), KEYS.slice(3, 6), KEYS.slice(6, 9), KEYS.slice(9, 12)];
 
-function personFromProfile(profile: UserProfile): DemoPerson {
-  return {
-    id: `contact-${profile.uid}`,
-    name: profile.displayName,
-    handle: `@${profile.username}`,
-    initials: getInitials(profile.displayName),
-    photoURL: profile.photoURL,
-    accent: '#000000',
-    identityId: profile.uid,
-  };
-}
-
 function DialKey({ value, letters, onPress }: { value: string; letters?: string; onPress: () => void }) {
   return (
     <Pressable
@@ -72,13 +55,11 @@ function DialKey({ value, letters, onPress }: { value: string; letters?: string;
 export function KeypadSheet({
   visible,
   contacts,
-  getIdToken,
   onClose,
   onStartCall,
 }: {
   visible: boolean;
   contacts: DemoPerson[];
-  getIdToken: () => Promise<string>;
   onClose: () => void;
   onStartCall: (person: DemoPerson, kind: CallKind) => void;
 }) {
@@ -86,7 +67,7 @@ export function KeypadSheet({
   const backgroundColor = useThemeBackground();
   const insets = useSafeAreaInsets();
   const [digits, setDigits] = useState('');
-  const [lookupState, setLookupState] = useState<'idle' | 'loading' | 'not-found' | 'error'>('idle');
+  const [lookupState, setLookupState] = useState<'idle' | 'not-found' | 'error'>('idle');
   const [lookupKind, setLookupKind] = useState<CallKind | null>(null);
 
   useEffect(() => {
@@ -118,42 +99,28 @@ export function KeypadSheet({
   };
 
   const lookup = async (kind: CallKind) => {
-    const normalizedNumber = normalizeDirectorySearchValue(digits);
+    const normalizedNumber = normalizeContactIdentifier(digits);
     if (!normalizedNumber || normalizedNumber.replace(/^\+/, '').length === 0) {
       setLookupState('error');
       return;
     }
 
     setLookupKind(kind);
-    setLookupState('loading');
     try {
       const localPerson = contacts.find(
-        (person) => person.phoneNumber && normalizeDirectorySearchValue(person.phoneNumber) === normalizedNumber,
+        (person) => person.phoneNumber && normalizeContactIdentifier(person.phoneNumber) === normalizedNumber,
       );
       if (localPerson) {
         onStartCall(localPerson, kind);
         onClose();
         return;
       }
-
-      const profiles = await searchUserProfiles(digits, await getIdToken());
-      const profile = profiles[0];
-      if (!profile) {
-        setLookupState('not-found');
-        return;
-      }
-
-      onStartCall(personFromProfile(profile), kind);
-      onClose();
+      setLookupState('not-found');
     } catch {
       setLookupState('error');
     } finally {
       setLookupKind(null);
     }
-  };
-
-  const invite = () => {
-    void Share.share({ message: `Join me on Callnet: ${digits}` }).catch(() => undefined);
   };
 
   const closeButtonIcon: { ios: SFSymbol; android: AndroidSymbol } = { ios: 'xmark', android: 'close' };
@@ -194,17 +161,13 @@ export function KeypadSheet({
             ) : null}
           </View>
 
-          {lookupState === 'loading' ? (
-            <ThemedText variant="subhead" tone="secondary" style={styles.statusText}>Looking up this number…</ThemedText>
-          ) : null}
           {lookupState === 'error' ? (
-            <ThemedText variant="subhead" tone="destructive" style={styles.statusText}>Enter a valid phone number.</ThemedText>
+            <ThemedText variant="subhead" tone="destructive" style={styles.statusText}>Enter a phone number to call.</ThemedText>
           ) : null}
           {lookupState === 'not-found' ? (
-            <View style={styles.notFoundRow}>
-              <ThemedText variant="subhead" tone="secondary" style={styles.notFoundText}>This number isn’t on Callnet.</ThemedText>
-              <Button title="Invite" variant="secondary" size="sm" onPress={invite} />
-            </View>
+            <ThemedText variant="subhead" tone="secondary" style={styles.statusText}>
+              That number isn’t in your saved Callnet contacts. Add the person from your phone contacts first.
+            </ThemedText>
           ) : null}
 
           <View style={styles.dialGrid}>
@@ -222,7 +185,7 @@ export function KeypadSheet({
               title="Audio"
               variant="secondary"
               size="lg"
-              disabled={lookupState === 'loading'}
+              disabled={lookupKind !== null}
               loading={lookupKind === 'voice'}
               onPress={() => void lookup('voice')}
               style={[styles.callAction, { borderColor: brand.accent }]}
@@ -230,7 +193,7 @@ export function KeypadSheet({
             <Button
               title="Video"
               size="lg"
-              disabled={lookupState === 'loading'}
+              disabled={lookupKind !== null}
               loading={lookupKind === 'video'}
               onPress={() => void lookup('video')}
               style={styles.callAction}
@@ -280,8 +243,6 @@ const styles = StyleSheet.create({
   numberText: { flex: 1, textAlign: 'center', fontVariant: ['tabular-nums'] },
   backspaceButton: { width: 48, height: 48, paddingHorizontal: 0 },
   statusText: { textAlign: 'center' },
-  notFoundRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  notFoundText: { flex: 1 },
   dialGrid: { width: '100%', maxWidth: 420, alignSelf: 'center', gap: Spacing.sm },
   dialRow: { flexDirection: 'row', gap: Spacing.sm },
   dialKey: {

@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/callnet-icon.png",
     "scheme": "callnet",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "com.orbitratech.callnet",
       "infoPlist": {
@@ -49,6 +49,12 @@
       "expo-router",
       "expo-dev-client",
       "expo-notifications",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts to find people you know on Callnet."
+        }
+      ],
       [
         "expo-build-properties",
         {

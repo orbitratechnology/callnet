@@ -21,9 +21,9 @@ function getStatusLabel(call: RecentCall) {
   if (call.outcome === 'completed') return 'Call completed';
   if (call.outcome === 'missed') return 'Missed call';
   if (call.outcome === 'timed-out') return 'No answer';
-  if (call.outcome === 'rejected') return 'Call declined';
+  if (call.outcome === 'rejected') return 'They declined';
   if (call.outcome === 'cancelled') return 'Call cancelled';
-  if (call.outcome === 'failed') return 'Call could not connect';
+  if (call.outcome === 'failed') return 'Couldn’t connect';
   return call.direction === 'incoming' ? 'Incoming call' : 'Outgoing call';
 }
 
